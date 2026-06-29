@@ -33,7 +33,10 @@ const { replaceAll } = require("./helper/regex")
 const RESERVED_KEYS = ["_BODY"]
 
 module.exports = function ume(options) {
-    let { contentDir, templatePath, quiet, verbose } = options;
+    let { contentDir, templatePath, quiet, verbose, helpers } = options;
+    helpers = helpers || {}
+    // define keys that can not be used
+    const FORBIDDEN_KEYS = [...RESERVED_KEYS, ...Object.keys(helpers)];
 
     if(quiet && verbose) {
         // if for some reason user wants less output but more output, we need to stop them
@@ -49,8 +52,8 @@ module.exports = function ume(options) {
     const cache = new Map();
     
     // fetch markdowns yay
-    if(verbose) console.log("[umejs] Fetching Markdown files in "+contentDir)
     const mdFiles = fs.readdirSync(contentDir).filter(f => f.endsWith('.md'));
+    if (verbose) console.log("[umejs] Fetching"+mdFiles.length+" Markdown file(s) in "+contentDir)
 
     // build all files
     for (const file of mdFiles) {
@@ -70,9 +73,9 @@ module.exports = function ume(options) {
         fmVariables = Object.entries(data)
         fmVariables.forEach(([key, value]) => {
             // check if user is using a reserved key
-            if (RESERVED_KEYS.includes(key)) {
-                console.error(styleText("red", "[umejs] Can not define a reserved key (defining '" + key + "' in " + file +")"))
-                throw Error
+            if (FORBIDDEN_KEYS.includes(key)) {
+                console.error(styleText("red", `[umejs] Forbidden key error: "${key}" is reserved or used as a helper in ${file}`));
+                throw Error;
             }
 
             finalHtml = replaceAll(finalHtml, `{${key}}`, value)
@@ -83,19 +86,18 @@ module.exports = function ume(options) {
         if(verbose) console.log("[umejs] Storing "+slug+" in cache.")
         cache.set(slug, finalHtml);
     }
-
-    // 3. Return the Express Middleware
+    if (!quiet) console.log(styleText("green", "[umejs] " + mdFiles.length + " Markdown file(s) in " + contentDir + " have been generated."))
+    // return the middleware
     return function (req, res, next) {
-        // Extract slug safely
-        // 1. Grab the param (it might be a string or an array)
+        // extract slug
         let slug = req.params.slug || req.params[0] || '';
 
-        // 2. If it's an array (Express 5 edge case), join it into a single string
+        // if it's an array, make into one
         if (Array.isArray(slug)) {
             slug = slug.join('/');
         }
 
-        // 3. Now safely get the basename
+        // get basename
         const slugName = path.basename(slug);
 
         if (!slug) {
@@ -108,7 +110,17 @@ module.exports = function ume(options) {
             return res.status(404).send('Post not found');
         }
 
+        // add user defined helper functions
+        let finalHtml = html;
+        for (const [key, fn] of Object.entries(helpers)) {
+            if (typeof fn === 'function') {
+                // execute the function and pass useful context (req, res, slug)
+                const dynamicValue = fn(req, res, slugName);
+                finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
+            }
+        }
+
         res.set('Content-Type', 'text/html');
-        res.send(html);
+        res.send(finalHtml);
     };
 };

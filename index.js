@@ -13,11 +13,11 @@
 
 // ? how does it work
 // 1. user defines that they want to use ume
-ume.init()
+// ume.init()
 // 2. this should build directories containing template.ume.html files
 // this means fetching all markdown files and making new <filename>.ume.html. this is the full html template and {MARKDOWN} replaced with the contents of the markdown file (in html)
 // 3. it should then respond to for example: 
-app.use("/:name", ume("/blog/", req, res, next))
+// app.use("/:name", ume("/blog/", req, res, next))
 // 4. when a user visits an endpoint, ume will automatically give the right html page (if exists)
 // :name would send the user <name>.ume.html
 

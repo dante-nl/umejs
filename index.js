@@ -180,7 +180,7 @@ module.exports = function ume(options) {
 
                 // if its partial update all pages
                 if (isPartial) {
-                    if (!quiet) console.log(`[umejs] Partial changed (${filename}), rebuilding all pages...`);
+                    if (!quiet) console.log(styleText("cyan", `[umejs] Partial changed (${filename}), rebuilding all pages...`));
                     for (const file of mdFiles) {
                         try {
                             buildSingleFile(file);
@@ -192,7 +192,7 @@ module.exports = function ume(options) {
                 
                 // rebuild regular old markdown files
                 else if (filename.endsWith('.md')) {
-                    if (!quiet) console.log(`[umejs] Detected change in ${filename}, rebuilding...`);
+                    if (!quiet) console.log(styleText("cyan", `[umejs] Detected change in ${filename}, rebuilding...`));
                     try {
                         buildSingleFile(filename);
                     } catch (err) {

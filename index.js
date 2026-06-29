@@ -145,18 +145,41 @@ module.exports = function ume(options) {
         console.log(styleText("green", `[umejs] ${mdFiles.length} Markdown file(s) in ${contentDir} have been generated.`));
     }
 
-    // ---- DEV MODE ----
+    // * dev mode
     if (mode === 'development') {
+        let partialsRelativePath = null;
+        if (partialsDir) {
+            const relPath = path.relative(contentDir, partialsDir);
+            // if relPath starts with '..', partialsDir is outside contentDir
+            if (relPath.startsWith('..')) {
+                console.warn(
+                    styleText("yellow",
+                        `[umejs] Warning: partialsDir (${partialsDir}) is outside contentDir (${contentDir}). ` +
+                        `Changes to partials will NOT be auto-detected in dev mode.`
+                    )
+                );
+            } else {
+                // normalize to use forward slashes for stupid windows
+                partialsRelativePath = relPath.split(path.sep).join('/');
+            }
+        }
+
         let timeout = null;
 
         fs.watch(contentDir, { recursive: true }, (event, filename) => {
             if (!filename) return;
 
+            // normalize filename to forward slashes for consistent checking
+            const normalizedFilename = filename.split(path.sep).join('/');
+
             if (timeout) clearTimeout(timeout);
             timeout = setTimeout(() => {
-                // to prevent quick updates in succession
-                // handle an update to a partial file
-                if (partialsDir && filename.startsWith('partials/')) {
+                // check if the changed file is inside the partials directory
+                const isPartial = partialsRelativePath &&
+                    normalizedFilename.startsWith(partialsRelativePath + '/');
+
+                // if its partial update all pages
+                if (isPartial) {
                     if (!quiet) console.log(`[umejs] Partial changed (${filename}), rebuilding all pages...`);
                     for (const file of mdFiles) {
                         try {
@@ -166,7 +189,8 @@ module.exports = function ume(options) {
                         }
                     }
                 }
-                // handle update for a simple regular markdown
+                
+                // rebuild regular old markdown files
                 else if (filename.endsWith('.md')) {
                     if (!quiet) console.log(`[umejs] Detected change in ${filename}, rebuilding...`);
                     try {

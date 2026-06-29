@@ -58,13 +58,26 @@ module.exports = function ume(options) {
     // 3. Return the Express Middleware
     return function (req, res, next) {
         // Extract slug safely
-        const slug = path.basename(req.params[0] || req.params.slug || '');
+        // 1. Grab the param (it might be a string or an array)
+        let slug = req.params.slug || req.params[0] || '';
+
+        // 2. If it's an array (Express 5 edge case), join it into a single string
+        if (Array.isArray(slug)) {
+            slug = slug.join('/');
+        }
+
+        // 3. Now safely get the basename
+
+        console.log('req.params:', req.params);
+        console.log('slug value:', slug, 'type:', typeof slug);
+        
+        const slugName = path.basename(slug);
 
         if (!slug) {
             return res.status(400).send('Slug is required');
         }
 
-        const html = cache.get(slug);
+        const html = cache.get(slugName);
 
         if (!html) {
             return res.status(404).send('Post not found');

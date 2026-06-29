@@ -27,31 +27,60 @@ const fs = require('fs');
 const path = require('path');
 const marked = require('marked'); // or any markdown parser
 const matter = require('gray-matter');
+const { styleText } = require("util")
+const { replaceAll } = require("./helper/regex")
+
+const RESERVED_KEYS = ["_BODY"]
 
 module.exports = function ume(options) {
-    const { contentDir, templatePath } = options;
+    let { contentDir, templatePath, quiet, verbose } = options;
 
-    // 1. Load the template ONCE at startup
+    if(quiet && verbose) {
+        // if for some reason user wants less output but more output, we need to stop them
+        quiet = false
+        console.log(styleText("yellow", "[umejs] Both quiet and verbose output specified; ignoring quiet setting"))
+    }
+
+    // on startup, load all files in template
+    if(!quiet) console.log(styleText("yellow", "[umejs] Initiliasing project at "+contentDir))
     const template = fs.readFileSync(templatePath, 'utf-8');
 
-    // 2. Build the cache ONCE at startup (This is your "build" step)
+    // define cache
     const cache = new Map();
+    
+    // fetch markdowns yay
+    if(verbose) console.log("[umejs] Fetching Markdown files in "+contentDir)
     const mdFiles = fs.readdirSync(contentDir).filter(f => f.endsWith('.md'));
 
+    // build all files
     for (const file of mdFiles) {
+        if(verbose) console.log("[umejs] Building "+file+"...")
         const slug = path.basename(file, '.md');
         const raw = fs.readFileSync(path.join(contentDir, file), 'utf-8');
 
-        // Parse frontmatter and markdown
+        // parse frontmatter and markdown
         const { data, content } = matter(raw);
         const htmlContent = marked.parse(content);
+        
+        if(verbose) console.log("[umejs] Initialising default config")
+        // final content
+        let finalHtml = replaceAll(template, "{_BODY}", htmlContent)
+        
+        // add all variables
+        fmVariables = Object.entries(data)
+        fmVariables.forEach(([key, value]) => {
+            // check if user is using a reserved key
+            if (RESERVED_KEYS.includes(key)) {
+                console.error(styleText("red", "[umejs] Can not define a reserved key (defining '" + key + "' in " + file +")"))
+                throw Error
+            }
 
-        // Replace placeholders in the template
-        let finalHtml = template
-            .replace(/{TITLE}/g, data.title || slug)
-            .replace(/{DATE}/g, data.date || '')
-            .replace(/{BODY}/g, htmlContent);
+            finalHtml = replaceAll(finalHtml, `{${key}}`, value)
+            
+            if(verbose) console.log("[umejs] Initialising variable "+key)
+        });
 
+        if(verbose) console.log("[umejs] Storing "+slug+" in cache.")
         cache.set(slug, finalHtml);
     }
 
@@ -67,10 +96,6 @@ module.exports = function ume(options) {
         }
 
         // 3. Now safely get the basename
-
-        console.log('req.params:', req.params);
-        console.log('slug value:', slug, 'type:', typeof slug);
-        
         const slugName = path.basename(slug);
 
         if (!slug) {

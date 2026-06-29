@@ -86,6 +86,7 @@ module.exports = function ume(options) {
         setupWatcher({
             contentDir,
             partialsDir,
+            cache,
             buildSingleFile: (file) => buildSingleFile(file, buildOptions),
             buildAllFiles: () => buildAllFiles(buildOptions),
             mdFiles,

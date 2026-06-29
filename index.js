@@ -1,28 +1,6 @@
 // ume
 // untitled markdown engine
 
-// ? what is the purpose?
-// a project that runs on an endpoint that puts markdown files into an html template
-// it needs to build on startup
-// it's basically gcc but for html and markdwown
-
-
-// ? how do i integrate
-// let user define an directory
-// look for template.ume.html
-
-// ? how does it work
-// 1. user defines that they want to use ume
-// ume.init()
-// 2. this should build directories containing template.ume.html files
-// this means fetching all markdown files and making new <filename>.ume.html. this is the full html template and {MARKDOWN} replaced with the contents of the markdown file (in html)
-// 3. it should then respond to for example: 
-// app.use("/:name", ume("/blog/", req, res, next))
-// 4. when a user visits an endpoint, ume will automatically give the right html page (if exists)
-// :name would send the user <name>.ume.html
-
-// * FINAL PURPOSE: integrate md with html into one file
-
 const fs = require('fs');
 const path = require('path');
 const marked = require('marked'); // or any markdown parser

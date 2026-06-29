@@ -17,12 +17,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const marked = require('marked');
-const matter = require('gray-matter');
-const { styleText } = require("util");
-const { replaceAll } = require("./helper/regex");
-
-const RESERVED_KEYS = ["_BODY"];
+const { replaceAll } = require('./lib/helpers');
+const { log, logError, logFatal, logWarn } = require('./lib/logger');
+const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
+const { setupWatcher } = require('./lib/watcher');
 
 /**
  * Express middleware that turns Markdown files into HTML pages.
@@ -42,7 +40,6 @@ module.exports = function ume(options) {
     } = options;
 
     helpers = helpers || {};
-
     mode = mode || "production";
 
     const FORBIDDEN_KEYS = [...RESERVED_KEYS, ...Object.keys(helpers)];
@@ -50,163 +47,51 @@ module.exports = function ume(options) {
     // if user for some reason wants quiet and loud logs, handle that
     if (quiet && verbose) {
         quiet = false;
-        console.log(styleText("yellow", "[umejs] Both quiet and verbose output specified; ignoring quiet setting"));
+        log("Both quiet and verbose output specified; ignoring quiet setting", "yellow", false);
     }
 
     // load template
-    if (!quiet) console.log(styleText("yellow", "[umejs] Initialising project at " + contentDir));
+    if (!quiet) log(`Initialising project at ${contentDir}`, "yellow", false);
 
     let template;
     try {
         template = fs.readFileSync(templatePath, 'utf-8');
     } catch (err) {
-        console.error(styleText("red", `[umejs] FATAL: Template file not found at ${templatePath}`));
-        process.exit(1);
+        logFatal(`Template file not found at ${templatePath}`);
     }
 
     // define cache
     const cache = new Map();
 
-    // * handle partials
-    function processPartials(htmlString) {
-        // if no partials, return same content
-        if (!partialsDir) return htmlString;
-
-        const regex = /\{_INCLUDE\(["']([^"']+)["']\)\}/g;
-
-        return htmlString.replace(regex, (match, filename) => {
-            // prevent directory traversal
-            const safeFilename = path.basename(filename);
-            const partialPath = path.join(partialsDir, safeFilename);
-
-            try {
-                const content = fs.readFileSync(partialPath, 'utf-8');
-                return processPartials(content);
-            } catch (err) {
-                console.warn(styleText("yellow", `[umejs] Partial not found: ${filename}`));
-                return match;
-            }
-        });
-    }
-
-    // * build single file
-    function buildSingleFile(file) {
-        if (verbose) console.log("[umejs] Building " + file + "...");
-
-        const slug = path.basename(file, '.md');
-        const raw = fs.readFileSync(path.join(contentDir, file), 'utf-8');
-
-        const { data, content } = matter(raw);
-        const htmlContent = marked.parse(content);
-
-        // inject body
-        let finalHtml = replaceAll(template, "{_BODY}", htmlContent);
-
-        // add partials
-        // done after body because the body may include some partials of its own
-        finalHtml = processPartials(finalHtml);
-
-        // add custom frontmatter variables
-        for (const [key, value] of Object.entries(data)) {
-            if (verbose) console.log("[umejs] Initialising variable " + key);
-
-            if (FORBIDDEN_KEYS.includes(key)) {
-                console.error(styleText("red", `[umejs] Forbidden key error: "${key}" is reserved or used as a helper in ${file}`));
-                throw new Error(`Forbidden key: ${key}`);
-            }
-            finalHtml = replaceAll(finalHtml, `{${key}}`, value);
-        }
-
-        cache.set(slug, finalHtml);
-        if (!quiet) console.log(`[umejs] Built ${file}`);
-    }
-
     // * build files
-    let mdFiles;
+    const buildOptions = {
+        contentDir,
+        template,
+        partialsDir,
+        forbiddenKeys: FORBIDDEN_KEYS,
+        cache,
+        quiet,
+        verbose
+    };
+
+    let mdFiles = [];
     try {
-        mdFiles = fs.readdirSync(contentDir).filter(f => f.endsWith('.md'));
+        mdFiles = buildAllFiles(buildOptions);
     } catch (err) {
-        console.error(styleText("red", `[umejs] FATAL: Content directory not found at ${contentDir}`));
-        process.exit(1);
-    }
-
-    if (verbose) console.log(`[umejs] Found ${mdFiles.length} Markdown file(s) in ${contentDir}`);
-
-    for (const file of mdFiles) {
-        try {
-            buildSingleFile(file);
-        } catch (err) {
-            console.error(styleText("red", `[umejs] ERROR: Skipping ${file}; ${err.message}`));
-            continue;
-        }
-    }
-
-    if (!quiet) {
-        console.log(styleText("green", `[umejs] ${mdFiles.length} Markdown file(s) in ${contentDir} have been generated.`));
+        logFatal(`Failed to build files: ${err.message}`);
     }
 
     // * dev mode
     if (mode === 'development') {
-        let partialsRelativePath = null;
-        if (partialsDir) {
-            const relPath = path.relative(contentDir, partialsDir);
-            // if relPath starts with '..', partialsDir is outside contentDir
-            if (relPath.startsWith('..')) {
-                console.warn(
-                    styleText("yellow",
-                        `[umejs] Warning: partialsDir (${partialsDir}) is outside contentDir (${contentDir}). ` +
-                        `Changes to partials will NOT be auto-detected in dev mode.`
-                    )
-                );
-            } else {
-                // normalize to use forward slashes for stupid windows
-                partialsRelativePath = relPath.split(path.sep).join('/');
-            }
-        }
-
-        let timeout = null;
-
-        fs.watch(contentDir, { recursive: true }, (event, filename) => {
-            if (!filename) return;
-
-            // normalize filename to forward slashes for consistent checking
-            const normalizedFilename = filename.split(path.sep).join('/');
-
-            if (timeout) clearTimeout(timeout);
-            timeout = setTimeout(() => {
-                // check if the changed file is inside the partials directory
-                const isPartial = partialsRelativePath &&
-                    normalizedFilename.startsWith(partialsRelativePath + '/');
-
-                // if its partial update all pages
-                if (isPartial) {
-                    if (!quiet) console.log(styleText("cyan", `[umejs] Partial changed (${filename}), rebuilding all pages...`));
-                    for (const file of mdFiles) {
-                        try {
-                            buildSingleFile(file);
-                        } catch (err) {
-                            console.error(styleText("red", `[umejs] ERROR: Skipping ${file}; ${err.message}`));
-                        }
-                    }
-                }
-                
-                // rebuild regular old markdown files
-                else if (filename.endsWith('.md')) {
-                    if (!quiet) console.log(styleText("cyan", `[umejs] Detected change in ${filename}, rebuilding...`));
-                    try {
-                        buildSingleFile(filename);
-                    } catch (err) {
-                        console.error(styleText("red", `[umejs] ERROR: Failed to rebuild ${filename}; ${err.message}`));
-                    }
-                }
-
-                timeout = null;
-            }, 150);
+        setupWatcher({
+            contentDir,
+            partialsDir,
+            buildSingleFile: (file) => buildSingleFile(file, buildOptions),
+            buildAllFiles: () => buildAllFiles(buildOptions),
+            mdFiles,
+            quiet,
+            verbose
         });
-
-        if (!quiet) {
-            console.log(styleText("yellow", "[umejs] Dev mode active. Watching for changes..."));
-        }
     }
 
     // * express middleware
@@ -236,7 +121,7 @@ module.exports = function ume(options) {
             res.set('Content-Type', 'text/html');
             res.send(finalHtml);
         } catch (err) {
-            console.error('[umejs] Request error:', err.message);
+            logError(`Request error: ${err.message}`, quiet);
             res.status(500).send('Internal server error');
         }
     };

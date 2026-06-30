@@ -14,6 +14,7 @@
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
  * @property {string} notFoundDir - Path to an HTML page to be served for a 404 error.
+ * @property {boolean} pretty - If set to `true`, ume will automatically parse the html through js-beautify
  */
 
 const fs = require('fs');
@@ -38,7 +39,8 @@ module.exports = function ume(options) {
         helpers,
         mode,
         partialsDir,
-        notFoundDir
+        notFoundDir,
+        pretty
     } = options;
 
     helpers = helpers || {};
@@ -106,8 +108,10 @@ module.exports = function ume(options) {
                 slug = slug.join('/');
             }
 
-            const slugName = path.basename(slug);
-            const html = cache.get(slugName);
+            // remove leading/trailing slashes if any
+            slug = slug.replace(/^\/|\/$/g, '');
+
+            const html = cache.get(slug);
 
             // check if page exists
             if (!slug || !html) {
@@ -128,9 +132,22 @@ module.exports = function ume(options) {
             let finalHtml = html;
             for (const [key, fn] of Object.entries(helpers)) {
                 if (typeof fn === 'function') {
-                    const dynamicValue = fn(req, res, slugName);
+                    const dynamicValue = fn(req, res, slug);
                     finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
                 }
+            }
+
+            // beautify the final code
+            const { html } = require('js-beautify');
+
+            if (options.pretty) {
+                finalHtml = html(finalHtml, {
+                    indent_size: 2,
+                    indent_char: ' ',
+                    max_preserve_newlines: 1,
+                    preserve_newlines: true,
+                    wrap_line_length: 0
+                });
             }
 
             res.set('Content-Type', 'text/html');

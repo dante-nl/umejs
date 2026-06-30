@@ -13,6 +13,7 @@
  *   Each function receives `(req, res, slug)` and must return a string.
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
+ * @property {string} notFoundDir - Path to an HTML page to be served for a 404 error.
  */
 
 const fs = require('fs');
@@ -36,7 +37,8 @@ module.exports = function ume(options) {
         verbose,
         helpers,
         mode,
-        partialsDir
+        partialsDir,
+        notFoundDir
     } = options;
 
     helpers = helpers || {};
@@ -107,8 +109,20 @@ module.exports = function ume(options) {
             const slugName = path.basename(slug);
             const html = cache.get(slugName);
 
+            // check if page exists
             if (!slug || !html) {
-                return res.status(404).send('File not found');
+                // if there is a directory for the 404 page, give that
+                if (notFoundDir) {
+                    res.status(404).sendFile(notFoundDir)
+                } else {
+                    res.status(404).send(`
+                        <h2>umejs</h2>
+                        <h1>404 - file not found</h1>
+                        <p>The file you were looking for could not be found. <b>PRO TIP:</b> You can specify your own 404 page with umejs!</p>    
+                    `);
+                }
+                return
+
             }
 
             let finalHtml = html;
@@ -123,7 +137,8 @@ module.exports = function ume(options) {
             res.send(finalHtml);
         } catch (err) {
             logError(`Request error: ${err.message}`, quiet);
-            res.status(500).send('Internal server error');
+            res.status(500).send('[umejs] Internal server error. Try again later');
+            return
         }
     };
 };

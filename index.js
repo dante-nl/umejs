@@ -145,14 +145,14 @@ module.exports = function ume(options) {
     // * express middleware
     return function (req, res, next) {
         try {
-            let slug = req.params.slug || req.params[0] || '';
+            let slug = req.params.slug || req.params[0] || 'index';
 
             if (Array.isArray(slug)) {
                 slug = slug.join('/');
             }
 
-            // remove leading/trailing slashes if any
-            slug = slug.replace(/^\/|\/$/g, '');
+            // remove leading/trailing slashes if any and .md file extensions
+            slug = slug.replace(/^\/|\.md(\/)*$|\/$/g, '');
 
             const html = cache.get(slug);
 

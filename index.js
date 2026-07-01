@@ -202,6 +202,10 @@ module.exports = function ume(options) {
             });
 
 
+            // handle any escaped characters and turn them normal
+            const escapedVarRegex = /(?:{{([^}]+)}}|\\{([^}]+)})/g
+            finalHtml = finalHtml.replace(escapedVarRegex, "{$1$2}")
+
             // beautify the final code
             if (options.pretty) {
                 finalHtml = jsBeautify.html(finalHtml, {

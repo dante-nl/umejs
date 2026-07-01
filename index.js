@@ -13,6 +13,7 @@
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
  * @property {string} [notFoundDir] - Path to an HTML page to be served for a 404 error.
+ * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML. (before prettify)
  * @property {boolean} [pretty] - If set to `true`, ume will automatically parse the html through js-beautify
  */
 
@@ -76,7 +77,8 @@ module.exports = function ume(options) {
         mode,
         partialsDir,
         notFoundDir,
-        pretty
+        pretty,
+        builders
     } = options;
 
     helpers = helpers || {};
@@ -175,14 +177,30 @@ module.exports = function ume(options) {
                 if (typeof fn === "object" && !fn.cache && fn.helper) {
                     // if it's a cached function, we don't need to run here (only realtime functions)
                     fn = fn.helper
+                } else if (typeof fn === "object" && fn.cache) {
+                    // if it is a cached object, we don't need to include it here to prevent unneeded warnings
+                    continue
                 }
                 if (typeof fn === 'function') {
                     const dynamicValue = fn(req, res, slug);
                     finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
+                } else {
+                    logWarn(`Invalid helper provided (expected type function, helper is ${typeof fn})`)
+                    console.log(fn)
                 }
             }
+            
+            builders.forEach(builder => { 
+                if (typeof builder === 'function') {
+                    const builderOutput = builder(req, res, slug, finalHtml);
+                    if (typeof builderOutput === "string") {
+                        finalHtml = builderOutput
+                    }
+                } else {
+                    logWarn(`Invalid builder provided (expected type function, builder is ${typeof builder})`)
+                }
+            });
 
-            // TODO: add a way to add custom functions that run just before the options thing
 
             // beautify the final code
             if (options.pretty) {

@@ -9,26 +9,62 @@
  * @property {string} templatePath - **Required**. Path to the .html template file.
  * @property {boolean} [quiet=false] - Suppress all console output except errors.
  * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
- * @property {Object.<string, Function>} [helpers] - Dynamic functions executed per request.
- *   Each function receives `(req, res, slug)` and must return a string.
+ * @property {Object<string, Helper>} [helpers] - Optional extra functions that run on build or for every request
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
- * @property {string} notFoundDir - Path to an HTML page to be served for a 404 error.
- * @property {boolean} pretty - If set to `true`, ume will automatically parse the html through js-beautify
+ * @property {string} [notFoundDir] - Path to an HTML page to be served for a 404 error.
+ * @property {boolean} [pretty] - If set to `true`, ume will automatically parse the html through js-beautify
+ */
+
+/**
+ * Simple helper to just return 
+ * @callback SimpleHelper
+ * @returns {string} The output to change the variable with
+ */
+
+/**
+ * Full helper function that is executed per request.
+ * @callback FullHelper
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {string} slug The pathname (excluding .md) that is currently visited
+ * @returns {*} The output to change the variable with
+ */
+
+/**
+ * When `cache` is set to true, function will be executed on startup and therefore there is no `req` or `res` to pass
+ * @callback SlugHelper
+ * @param {string} slug he pathname (excluding .md) of the page that is currently being built.
+ * @returns {*} The output to change the variable with.
+ */
+
+/**
+ * @typedef {SimpleHelper | FullHelper | SlugHelper} HelperCallable
+ */
+
+/**
+ * @typedef {Object} HelperObject
+ * @property {boolean} [cache=false] When set to true, the function will only be called once on build, instead of per request.
+ * @property {HelperCallable} helper The helper function to execute
+ */
+
+/**
+ * @typedef {HelperCallable | HelperObject} Helper
  */
 
 const fs = require('fs');
 const path = require('path');
+const jsBeautify = require('js-beautify');
 const { replaceAll } = require('./lib/helpers');
 const { log, logError, logFatal, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
 const { setupWatcher } = require('./lib/watcher');
 
 /**
- * Express middleware that turns Markdown files into HTML pages.
+ * umejs! expressjs middleware for serving Markdown pages
  * 
  * @param {UmeOptions} options
- * @returns {import('express').RequestHandler}
+ * @returns
  */
 module.exports = function ume(options) {
     let {
@@ -56,6 +92,7 @@ module.exports = function ume(options) {
 
     // load template
     if (!quiet) log(`Initialising project at ${contentDir}`, "yellow", false);
+    const startTime = new Date()
 
     let template;
     try {
@@ -75,7 +112,8 @@ module.exports = function ume(options) {
         forbiddenKeys: FORBIDDEN_KEYS,
         cache,
         quiet,
-        verbose
+        verbose,
+        helpers
     };
 
     let mdFiles = [];
@@ -84,6 +122,9 @@ module.exports = function ume(options) {
     } catch (err) {
         logFatal(`Failed to build files: ${err.message}`);
     }
+
+    const deltaTime = new Date() - startTime
+    log(`All files built - took ${deltaTime}ms`, "green", quiet)
 
     // * dev mode
     if (mode === 'development') {
@@ -130,18 +171,22 @@ module.exports = function ume(options) {
             }
 
             let finalHtml = html;
-            for (const [key, fn] of Object.entries(helpers)) {
+            for (let [key, fn] of Object.entries(helpers)) {
+                if (typeof fn === "object" && !fn.cache && fn.helper) {
+                    // if it's a cached function, we don't need to run here (only realtime functions)
+                    fn = fn.helper
+                }
                 if (typeof fn === 'function') {
                     const dynamicValue = fn(req, res, slug);
                     finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
                 }
             }
 
-            // beautify the final code
-            const { html } = require('js-beautify');
+            // TODO: add a way to add custom functions that run just before the options thing
 
+            // beautify the final code
             if (options.pretty) {
-                finalHtml = html(finalHtml, {
+                finalHtml = jsBeautify.html(finalHtml, {
                     indent_size: 2,
                     indent_char: ' ',
                     max_preserve_newlines: 1,

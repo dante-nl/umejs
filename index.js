@@ -14,7 +14,6 @@
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
  * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
  * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML. (before prettify)
- * @property {boolean} [pretty] - If set to `true`, ume will automatically parse the html through js-beautify
  */
 
 /**
@@ -55,7 +54,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const jsBeautify = require('js-beautify');
 const { replaceAll } = require('./lib/helpers');
 const { log, logError, logFatal, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
@@ -77,7 +75,6 @@ module.exports = function ume(options) {
         mode,
         partialsDir,
         notFoundPath,
-        pretty,
         builders
     } = options;
 
@@ -213,17 +210,6 @@ module.exports = function ume(options) {
             // handle any escaped {_INCLUDE()} statements
             const escapedIncludeRegex = /(?:{{(_INCLUDE\(["'][^"']+["']\))\}}|\\{(_INCLUDE\(["'][^"']+["']\))\})/g;
             finalHtml = finalHtml.replace(escapedIncludeRegex, '{$1$2}');
-
-            // beautify the final code
-            if (options.pretty) {
-                finalHtml = jsBeautify.html(finalHtml, {
-                    indent_size: 2,
-                    indent_char: ' ',
-                    max_preserve_newlines: 1,
-                    preserve_newlines: true,
-                    wrap_line_length: 0
-                });
-            }
 
             res.set('Content-Type', 'text/html');
             res.send(finalHtml);

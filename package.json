@@ -25,6 +25,9 @@
     "index.js",
     "lib/"
   ],
+  "engines": {
+    "node": "^22.0.0"
+  },
   "dependencies": {
     "express": "^5.2.1",
     "gray-matter": "^4.0.3",

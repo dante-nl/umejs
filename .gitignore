@@ -146,3 +146,4 @@ vite.config.ts.timestamp-*
 
 # ume gitignore
 .DS_Store
+package-lock.json

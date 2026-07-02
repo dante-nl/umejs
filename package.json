@@ -22,9 +22,6 @@
     "index.js",
     "lib/"
   ],
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "dependencies": {
     "express": "^5.2.1",
     "gray-matter": "^4.0.3",

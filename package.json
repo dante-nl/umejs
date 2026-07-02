@@ -18,6 +18,9 @@
   "directories": {
     "lib": "lib"
   },
+  "scripts": {
+    "test": "node --test"
+  },
   "files": [
     "index.js",
     "lib/"

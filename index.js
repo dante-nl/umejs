@@ -12,7 +12,7 @@
  * @property {Object<string, Helper>} [helpers] - Optional extra functions that run on build or for every request
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
- * @property {string} [notFoundDir] - Path to an HTML page to be served for a 404 error.
+ * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
  * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML. (before prettify)
  * @property {boolean} [pretty] - If set to `true`, ume will automatically parse the html through js-beautify
  */
@@ -76,12 +76,13 @@ module.exports = function ume(options) {
         helpers,
         mode,
         partialsDir,
-        notFoundDir,
+        notFoundPath,
         pretty,
         builders
     } = options;
 
     helpers = helpers || {};
+    builders = builders || []
     mode = mode || "production";
 
     const FORBIDDEN_KEYS = [...RESERVED_KEYS, ...Object.keys(helpers)];
@@ -159,8 +160,8 @@ module.exports = function ume(options) {
             // check if page exists
             if (!slug || !html) {
                 // if there is a directory for the 404 page, give that
-                if (notFoundDir) {
-                    res.status(404).sendFile(notFoundDir)
+                if (notFoundPath) {
+                    res.status(404).sendFile(notFoundPath)
                 } else {
                     res.status(404).send(`
                         <h2>umejs</h2>
@@ -173,6 +174,9 @@ module.exports = function ume(options) {
             }
 
             let finalHtml = html;
+            // replace _SLUG
+            finalHtml = replaceAll(finalHtml, `{_SLUG}`, slug)
+
             for (let [key, fn] of Object.entries(helpers)) {
                 if (typeof fn === "object" && !fn.cache && fn.helper) {
                     // if it's a cached function, we don't need to run here (only realtime functions)
@@ -205,6 +209,10 @@ module.exports = function ume(options) {
             // handle any escaped characters and turn them normal
             const escapedVarRegex = /(?:{{([^}]+)}}|\\{([^}]+)})/g
             finalHtml = finalHtml.replace(escapedVarRegex, "{$1$2}")
+
+            // handle any escaped {_INCLUDE()} statements
+            const escapedIncludeRegex = /(?:{{(_INCLUDE\(["'][^"']+["']\))\}}|\\{(_INCLUDE\(["'][^"']+["']\))\})/g;
+            finalHtml = finalHtml.replace(escapedIncludeRegex, '{$1$2}');
 
             // beautify the final code
             if (options.pretty) {

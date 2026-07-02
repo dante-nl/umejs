@@ -16,7 +16,7 @@ Let's set up a sample website for ume! Here's an example for your `main.js` file
 
 ```js
 // main.js
-const ume = require('umejs');
+const ume = require('@dantenl/umejs');
 const express = require('express');
 const path = require('path');
 

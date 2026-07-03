@@ -152,21 +152,30 @@ module.exports = function ume(options) {
             // remove leading/trailing slashes if any and .md file extensions
             slug = slug.replace(/^\/|\.md(\/)*$|\/$/g, '');
 
-            const html = cache.get(slug);
+            let html = cache.get(slug);
 
             // check if page exists
             if (!slug || !html) {
                 // if there is a directory for the 404 page, give that
                 if (notFoundPath) {
                     res.status(404).sendFile(notFoundPath)
+                    return
                 } else {
-                    res.status(404).send(`
-                        <h2>umejs</h2>
-                        <h1>404 - file not found</h1>
-                        <p>The file you were looking for could not be found. <b>PRO TIP:</b> You can specify your own 404 page with umejs!</p>    
-                    `);
+                    // check if user perhaps has a 404.md file
+                    const notFoundMd = cache.get("404")
+                    if(notFoundMd) {
+                        res.status(404)
+                        html = notFoundMd
+                    } else {
+                        // user does not, send very basic 404 page
+                        res.status(404).send(`
+                            <h2>umejs</h2>
+                            <h1>404 - file not found</h1>
+                            <p>The file you were looking for could not be found. <b>PRO TIP:</b> You can specify your own 404 page with umejs!</p>    
+                        `);
+                        return
+                    }
                 }
-                return
 
             }
 

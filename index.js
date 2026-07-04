@@ -59,7 +59,7 @@ const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build')
 const { setupWatcher } = require('./lib/watcher');
 
 /**
- * umejs! expressjs middleware for serving Markdown pages
+ * umejs expressjs middleware for serving Markdown pages
  *
  * @param {UmeOptions} options
  * @returns

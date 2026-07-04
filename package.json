@@ -27,8 +27,8 @@
         "lib": "lib"
     },
     "scripts": {
-        "lint": "npx eslint .",
-        "lint:fix": "npx eslint --fix .",
+        "lint": "eslint .",
+        "lint:fix": "eslint --fix .",
         "format": "prettier --write .",
         "test": "node --test"
     },
@@ -46,14 +46,19 @@
     "peerDependencies": {
         "express": ">=5.0.0"
     },
-    ".": {
-        "require": "./index.js",
-        "import": "./index.js"
+    "exports": {
+        ".": {
+            "require": "./index.js"
+        }
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "eslint": "^10.6.0",
         "globals": "^17.7.0",
         "prettier": "^3.9.4"
-    }
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "types": "./index.js"
 }

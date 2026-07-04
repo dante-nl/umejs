@@ -18,7 +18,7 @@ test('full Express app serves a markdown page', async (t) => {
     await fs.mkdir(contentDir);
     await fs.writeFile(
         path.join(contentDir, 'hello.md'),
-        '---\ntitle: Hello\n---\n# World\n{title}'
+        '---\ntitle: Hello\n---\n# World\n{title}',
     );
 
     const templatePath = path.join(tempDir, 'layout.ume.html');
@@ -42,9 +42,8 @@ test('full Express app serves a markdown page', async (t) => {
     const response = await fetch(`http://localhost:${port}/hello`);
     const body = await response.text();
 
-    
     // assert the response
     assert.match(body, /<h1>World<\/h1>/);
-    assert.match(body, /<p>Hello<\/p>/)
+    assert.match(body, /<p>Hello<\/p>/);
     assert.match(body, /<html>.*<body>.*<\/body>.*<\/html>/s); // 's' flag allows . to match newlines
 });

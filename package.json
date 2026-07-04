@@ -1,60 +1,59 @@
 {
-  "name": "@dantenl/umejs",
-  "version": "1.1.0",
-  "description": "Untitled Markdown Engine",
-  "keywords": [
-    "markdown",
-    "engine",
-    "parser",
-    "express",
-    "static-site",
-    "gray-matter",
-    "marked"
-  ],
-  "homepage": "https://github.com/dante-nl/umejs#readme",
-  "bugs": {
-    "url": "https://github.com/dante-nl/umejs/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/dante-nl/umejs.git"
-  },
-  "license": "GPL-3.0",
-  "author": "dante_nl",
-  "type": "commonjs",
-  "main": "index.js",
-  "directories": {
-    "lib": "lib"
-  },
-  "scripts": {
-    "lint": "npx eslint .",
-    "lint:fix": "npx eslint --fix .",
-    "format": "prettier --write .",
-    "test": "node --test"
-  },
-  "files": [
-    "index.js",
-    "lib/"
-  ],
-  "engines": {
-    "node": ">=22.13 <27.0.0"
-  },
-  "dependencies": {
-    "gray-matter": "^4.0.3",
-    "marked": "^18.0.5"
-  },
-  "peerDependencies": {
-    "express": ">=5.0.0"
-  },
-  ".": {
-    "require": "./index.js",
-    "import": "./index.js"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "eslint": "^10.6.0",
-    "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.7.0",
-    "prettier": "^3.9.4"
-  }
+    "name": "@dantenl/umejs",
+    "version": "1.1.0",
+    "description": "Untitled Markdown Engine",
+    "keywords": [
+        "markdown",
+        "engine",
+        "parser",
+        "express",
+        "static-site",
+        "gray-matter",
+        "marked"
+    ],
+    "homepage": "https://github.com/dante-nl/umejs#readme",
+    "bugs": {
+        "url": "https://github.com/dante-nl/umejs/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/dante-nl/umejs.git"
+    },
+    "license": "GPL-3.0",
+    "author": "dante_nl",
+    "type": "commonjs",
+    "main": "index.js",
+    "directories": {
+        "lib": "lib"
+    },
+    "scripts": {
+        "lint": "npx eslint .",
+        "lint:fix": "npx eslint --fix .",
+        "format": "prettier --write .",
+        "test": "node --test"
+    },
+    "files": [
+        "index.js",
+        "lib/"
+    ],
+    "engines": {
+        "node": ">=22.13 <27.0.0"
+    },
+    "dependencies": {
+        "gray-matter": "^4.0.3",
+        "marked": "^18.0.5"
+    },
+    "peerDependencies": {
+        "express": ">=5.0.0"
+    },
+    ".": {
+        "require": "./index.js",
+        "import": "./index.js"
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "eslint": "^10.6.0",
+        "globals": "^17.7.0",
+        "prettier": "^3.9.4"
+    }
 }

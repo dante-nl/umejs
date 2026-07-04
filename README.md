@@ -28,9 +28,9 @@ const app = express();
 const PORT = 3000;
 
 const blogMiddleware = ume({
-  contentDir: path.join(__dirname, 'content'), // where .md files live
-  templatePath: path.join(__dirname, 'templates', 'layout.ume.html'), // main layout
-  // there are more config options, check out the docs!
+    contentDir: path.join(__dirname, 'content'), // where .md files live
+    templatePath: path.join(__dirname, 'templates', 'layout.ume.html'), // main layout
+    // there are more config options, check out the docs!
 });
 
 // initialise the middleware
@@ -38,7 +38,7 @@ app.use('/*slug', blogMiddleware);
 
 // start the server
 app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Server running at http://localhost:${PORT}`);
 });
 ```
 
@@ -48,14 +48,14 @@ This is all you ned for your main JS file! Now we need a simple template:
 <!-- templates/layout.ume.html -->
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title}</title>
-  </head>
-  <body>
-    {_BODY}
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{title}</title>
+    </head>
+    <body>
+        {_BODY}
+    </body>
 </html>
 ```
 

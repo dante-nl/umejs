@@ -1,0 +1,48 @@
+name: CI
+
+on:
+    push:
+        branches: [main, dev]
+    pull_request:
+        branches: [main]
+
+jobs:
+    # get latest node versions
+    get-lts-versions:
+        runs-on: ubuntu-latest
+        outputs:
+            versions: ${{ steps.get-versions.outputs.lts }}
+        steps:
+            - id: get-versions
+              uses: msimerson/node-lts-versions@v2
+
+    # define usage of latest versions
+    test:
+        needs: get-lts-versions
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: ${{ fromJson(needs.get-lts-versions.outputs.versions) }}
+            fail-fast: false
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run ESLint
+              run: npm run lint
+
+            - name: Run Prettier
+              run: npx prettier --check .
+
+            - name: Run Tests
+              run: npm test

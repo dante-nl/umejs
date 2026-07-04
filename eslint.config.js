@@ -10,9 +10,9 @@ module.exports = defineConfig([
         extends: ['js/recommended'],
         languageOptions: {
             globals: {
-                process: "readonly",
-                ...globals.browser
-            }
+                process: 'readonly',
+                ...globals.browser,
+            },
         },
     },
     { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },

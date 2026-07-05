@@ -1,19 +1,23 @@
 // ume
 // untitled markdown engine
 
+// TODO: add support for calling next() on 404 and 500
+// TODO: add support for custom markdown parsers
+
 /**
  * Configuration options for the ume middleware.
  *
  * @typedef {Object} UmeOptions
  * @property {string} contentDir - **Required**. Path to the directory containing .md files.
- * @property {string} templatePath - **Required**. Path to the .html template file.
+ * @property {string} templatePath - **Required**. Path to the HTML template file.
  * @property {boolean} [quiet=false] - Suppress all console output except errors.
  * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
  * @property {Object<string, Helper>} [helpers] - Optional extra functions that run on build or for every request
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
  * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
- * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML. (before prettify)
+ * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown
+ * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML
  */
 
 /**
@@ -75,6 +79,7 @@ module.exports = function ume(options) {
         partialsDir,
         notFoundPath,
         builders,
+        parsers,
     } = options;
 
     helpers = helpers || {};
@@ -113,6 +118,7 @@ module.exports = function ume(options) {
         quiet,
         verbose,
         helpers,
+        parsers,
     };
 
     let mdFiles = [];

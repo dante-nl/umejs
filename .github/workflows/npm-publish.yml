@@ -1,35 +1,77 @@
-# This workflow will run tests using node and then publish a package to npm
-# For more information see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
-
 name: Publish to npm
 
 on:
     release:
         types: [created]
-        branches: [main]
     workflow_dispatch:
 
 jobs:
-    build:
+    # get latest major versions from node
+    get-lts-versions:
         runs-on: ubuntu-latest
+        outputs:
+            versions: ${{ steps.get-versions.outputs.lts }}
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
-              with:
-                  node-version: [22, 23, 24, 25, 26]
-            - run: npm ci
-            - run: npm test
+            - id: get-versions
+              uses: msimerson/node-lts-versions@v2
 
+    # run test
+    test:
+        needs: get-lts-versions
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                node-version: ${{ fromJson(needs.get-lts-versions.outputs.versions) }}
+            fail-fast: false
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run ESLint
+              run: npm run lint
+
+            - name: Run Prettier
+              run: npx prettier --check .
+
+            - name: Build ESM version
+              run: npm run build
+
+            - name: Run Tests
+              run: npm test
+
+    # publish to npm
     publish-npm:
-        needs: build
+        needs: test
         runs-on: ubuntu-latest
         permissions:
             id-token: write
             contents: read
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
               with:
-                  node-version: 26
-            - run: npm ci
-            - run: npm publish --access public
+                  node-version: 'lts/*'
+                  registry-url: 'https://registry.npmjs.org'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build ESM and JSDoc Types
+              run: |
+                  npm run build
+                  npm run build:types
+
+            - name: Publish Package via Trusted Publisher
+              run: npm publish --access public --provenance

@@ -1,25 +1,6 @@
 // ume
 // untitled markdown engine
 
-// TODO: add support for calling next() on 404 and 500
-// TODO: add support for custom markdown parsers
-
-/**
- * Configuration options for the ume middleware.
- *
- * @typedef {Object} UmeOptions
- * @property {string} contentDir - **Required**. Path to the directory containing .md files.
- * @property {string} templatePath - **Required**. Path to the HTML template file.
- * @property {boolean} [quiet=false] - Suppress all console output except errors.
- * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
- * @property {Object<string, Helper>} [helpers] - Optional extra functions that run on build or for every request
- * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
- * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
- * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
- * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown
- * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML
- */
-
 /**
  * Simple helper to just return
  * @callback SimpleHelper
@@ -29,8 +10,8 @@
 /**
  * Full helper function that is executed per request.
  * @callback FullHelper
- * @param {import('express').Request} req
- * @param {import('express').Response} res
+ * @param {Object} req Express `req` object
+ * @param {Object} res Express `res` object
  * @param {string} slug The pathname (excluding .md) that is currently visited
  * @returns {*} The output to change the variable with
  */
@@ -56,7 +37,25 @@
  * @typedef {HelperCallable | HelperObject} Helper
  */
 
+/**
+ * Configuration options for the ume middleware.
+ *
+ * @typedef {Object} UmeOptions
+ * @property {string} contentDir - **Required**. Path to the directory containing .md files.
+ * @property {string} templatePath - **Required**. Path to the HTML template file.
+ * @property {boolean} [quiet=false] - Suppress all console output except errors.
+ * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
+ * @property {boolean} [nextUsage=false] - When encountering a 404 or 500 error, should umejs call next() and do nothing?
+ * @property {Record<string, Helper>} [helpers] - Optional extra functions that run on build or for every request
+ * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
+ * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
+ * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
+ * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown
+ * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML
+ */
+
 const fs = require('node:fs');
+const path = require('node:path');
 const { replaceAll } = require('./lib/helpers');
 const { log, logError, logFatal, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
@@ -66,7 +65,6 @@ const { setupWatcher } = require('./lib/watcher');
  * umejs expressjs middleware for serving Markdown pages
  *
  * @param {UmeOptions} options
- * @returns
  */
 module.exports = function ume(options) {
     let {
@@ -80,6 +78,7 @@ module.exports = function ume(options) {
         notFoundPath,
         builders,
         parsers,
+        nextUsage,
     } = options;
 
     helpers = helpers || {};
@@ -96,7 +95,32 @@ module.exports = function ume(options) {
 
     // load template
     if (!quiet) log(`Initialising project at ${contentDir}`, 'yellow', false);
-    const startTime = new Date();
+    const startTime = Date.now();
+
+    let cachedHelpers = {};
+    const realtimeHelpers = {};
+
+    // separate cached helpers and non cached helpers
+    for (let [key, fn] of Object.entries(helpers)) {
+        let helperFunction;
+        if (typeof fn === 'object' && fn.helper) {
+            helperFunction = fn.helper;
+        } else {
+            helperFunction = fn;
+        }
+        if (typeof helperFunction === 'function') {
+            // run helper, use await in case its a promise
+            if (typeof fn === 'object' && fn.cache) {
+                cachedHelpers[key] = helperFunction;
+            } else {
+                realtimeHelpers[key] = helperFunction;
+            }
+        } else {
+            logWarn(
+                `Invalid helper provided (expected type function, helper is ${typeof helperFunction})`,
+            );
+        }
+    }
 
     let template;
     try {
@@ -117,7 +141,7 @@ module.exports = function ume(options) {
         cache,
         quiet,
         verbose,
-        helpers,
+        cachedHelpers,
         parsers,
     };
 
@@ -128,7 +152,7 @@ module.exports = function ume(options) {
         logFatal(`Failed to build files: ${err.message}`);
     }
 
-    const deltaTime = new Date() - startTime;
+    const deltaTime = Date.now() - startTime;
     log(`All files built - took ${deltaTime}ms`, 'green', quiet);
 
     // * dev mode
@@ -145,7 +169,7 @@ module.exports = function ume(options) {
     }
 
     // * express middleware
-    return function (req, res) {
+    return async function (req, res, next) {
         try {
             let slug = req.params.slug || req.params[0] || 'index';
 
@@ -160,9 +184,14 @@ module.exports = function ume(options) {
 
             // check if page exists
             if (!slug || !html) {
+                // if user wants to do everything themselves, let them.
+                if (nextUsage) {
+                    next();
+                    return;
+                }
                 // if there is a directory for the 404 page, give that
                 if (notFoundPath) {
-                    res.status(404).sendFile(notFoundPath);
+                    res.status(404).sendFile(path.resolve(notFoundPath));
                     return;
                 } else {
                     // check if user perhaps has a 404.md file
@@ -186,28 +215,20 @@ module.exports = function ume(options) {
             // replace _SLUG
             finalHtml = replaceAll(finalHtml, `{_SLUG}`, slug);
 
-            for (let [key, fn] of Object.entries(helpers)) {
-                if (typeof fn === 'object' && !fn.cache && fn.helper) {
-                    // if it's a cached function, we don't need to run here (only realtime functions)
-                    fn = fn.helper;
-                } else if (typeof fn === 'object' && fn.cache) {
-                    // if it is a cached object, we don't need to include it here to prevent unneeded warnings
-                    continue;
-                }
+            for (let [key, fn] of Object.entries(realtimeHelpers)) {
                 if (typeof fn === 'function') {
-                    const dynamicValue = fn(req, res, slug);
+                    const dynamicValue = await fn(req, res, slug);
                     finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
                 } else {
                     logWarn(
                         `Invalid helper provided (expected type function, helper is ${typeof fn})`,
                     );
-                    console.log(fn);
                 }
             }
 
-            builders.forEach((builder) => {
+            for (const builder of builders) {
                 if (typeof builder === 'function') {
-                    const builderOutput = builder(req, res, slug, finalHtml);
+                    const builderOutput = await builder(req, res, slug, finalHtml);
                     if (typeof builderOutput === 'string') {
                         finalHtml = builderOutput;
                     }
@@ -216,7 +237,9 @@ module.exports = function ume(options) {
                         `Invalid builder provided (expected type function, builder is ${typeof builder})`,
                     );
                 }
-            });
+            }
+
+            await finalHtml;
 
             // handle any escaped characters and turn them normal
             const escapedVarRegex = /(?:{{([^}]+)}}|\\{([^}]+)})/g;
@@ -231,7 +254,15 @@ module.exports = function ume(options) {
             res.send(finalHtml);
         } catch (err) {
             logError(`Request error: ${err.message}`, quiet);
-            res.status(500).send('[umejs] Internal server error. Try again later');
+            // if user wants to do everything themselves, let them.
+            if (nextUsage) {
+                next(err);
+            } else {
+                // if not, umejs should just do something
+                if (!res.headersSent) {
+                    res.status(500).send('[umejs] Internal server error. Try again later.');
+                }
+            }
             return;
         }
     };

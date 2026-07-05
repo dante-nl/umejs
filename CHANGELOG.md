@@ -4,6 +4,7 @@
 - umejs now also supports simply parsing `next()` when encountering a 404 error or 500 error.
 - Updated the `package.json` to be a bit more competent, including things such as linting using eslint and formatting using Prettier.
 - umejs can now be used as an ES module
+- Improved JSDoc support
 
 # v1.1.0 [2026-07-03]
 

@@ -31,7 +31,8 @@
         "lint:fix": "eslint --fix .",
         "format": "prettier --write .",
         "build": "node esbuild.config.mjs",
-        "test": "node --test"
+        "test": "node --test",
+        "test:esm": "node --test ./tests/esm-verify.test.mjs "
     },
     "files": [
         "index.js",

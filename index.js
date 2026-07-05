@@ -56,7 +56,7 @@
  * @typedef {HelperCallable | HelperObject} Helper
  */
 
-const fs = require('fs');
+const fs = require("node:fs");
 const { replaceAll } = require('./lib/helpers');
 const { log, logError, logFatal, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');

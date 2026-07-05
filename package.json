@@ -32,8 +32,8 @@
         "format": "prettier --write .",
         "build": "node esbuild.config.mjs",
         "build:types": "tsc",
-        "test": "node --test",
-        "test:esm": "node --test ./tests/esm-verify.test.mjs "
+        "test": "c8 node --test",
+        "test:esm": "c8 node --test ./tests/esm-verify.test.mjs "
     },
     "files": [
         "index.js",
@@ -63,6 +63,7 @@
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@types/node": "^26.1.0",
+        "c8": "^11.0.0",
         "esbuild": "^0.28.1",
         "eslint": "^10.6.0",
         "globals": "^17.7.0",

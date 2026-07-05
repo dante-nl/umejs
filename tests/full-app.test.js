@@ -26,7 +26,7 @@ test('full Express app serves a markdown page', async (t) => {
 
     // create Express app with middleware
     const app = express();
-    app.use('/{*slug}', ume({ contentDir, templatePath }));
+    app.use('/{*slug}', ume({ contentDir, templatePath, quiet: true }));
 
     // test the route
     const server = app.listen(0);

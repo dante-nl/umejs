@@ -3,8 +3,9 @@
 - It is now possible to add a custom Markdown parser. These functions receive the Markdown content before it has been parsed and should return new Markdown/HTML.
 - umejs now also supports simply parsing `next()` when encountering a 404 error or 500 error.
 - Updated the `package.json` to be a bit more competent, including things such as linting using eslint and formatting using Prettier.
-- umejs can now be used as an ES module
-- Improved JSDoc support
+- umejs can now be used as an ES module.
+- Added TypeScript as a dev dependancy and fixed issues that popped up there.
+- Improved JSDoc support.
 
 # v1.1.0 [2026-07-03]
 

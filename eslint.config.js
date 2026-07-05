@@ -5,7 +5,7 @@ const globals = require('globals');
 
 module.exports = defineConfig([
     {
-        ignores: ["dist/**", "node_modules/**", "coverage/**"],
+        ignores: ['dist/**', 'node_modules/**', 'coverage/**'],
         files: ['**/*.{js,mjs,cjs}'],
         plugins: { js },
         extends: ['js/recommended'],

@@ -32,8 +32,9 @@
         "format": "prettier --write .",
         "build": "node esbuild.config.mjs",
         "build:types": "tsc",
-        "test": "c8 node --test",
-        "test:esm": "c8 node --test ./tests/esm-verify.test.mjs "
+        "test": "c8 --check-coverage --lines 80 --branches 80 node --test",
+        "test:esm": "c8 node --test ./tests/esm-verify.test.mjs ",
+        "test:coverage": "c8 --reporter=html --reporter=text node --test"
     },
     "files": [
         "index.js",

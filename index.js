@@ -146,6 +146,7 @@ module.exports = function ume(options) {
     };
 
     let mdFiles = [];
+
     try {
         mdFiles = buildAllFiles(buildOptions);
     } catch (err) {
@@ -156,8 +157,9 @@ module.exports = function ume(options) {
     log(`All files built - took ${deltaTime}ms`, 'green', quiet);
 
     // * dev mode
+    let watcher;
     if (mode === 'development') {
-        setupWatcher({
+        watcher = setupWatcher({
             contentDir,
             partialsDir,
             cache,
@@ -169,7 +171,7 @@ module.exports = function ume(options) {
     }
 
     // * express middleware
-    return async function (req, res, next) {
+    const middleware = async function (req, res, next) {
         try {
             let slug = req.params.slug || req.params[0] || 'index';
 
@@ -227,6 +229,7 @@ module.exports = function ume(options) {
             }
 
             for (const builder of builders) {
+                console.log('HI!!');
                 if (typeof builder === 'function') {
                     const builderOutput = await builder(req, res, slug, finalHtml);
                     if (typeof builderOutput === 'string') {
@@ -263,7 +266,12 @@ module.exports = function ume(options) {
                     res.status(500).send('[umejs] Internal server error. Try again later.');
                 }
             }
-            return;
         }
     };
+    if (watcher) {
+        middleware.close = function closeWatcher() {
+            watcher.close();
+        };
+    }
+    return middleware;
 };

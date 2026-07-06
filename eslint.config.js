@@ -15,6 +15,9 @@ module.exports = defineConfig([
                 ...globals.browser,
             },
         },
+        rules: {
+            'no-control-regex': 0,
+        },
     },
     { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },
 ]);

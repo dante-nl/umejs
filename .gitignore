@@ -148,3 +148,6 @@ vite.config.ts.timestamp-*
 .DS_Store
 
 types
+
+coverage/
+.nyc_output/

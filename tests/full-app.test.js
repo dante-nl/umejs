@@ -231,7 +231,7 @@ test('umejs integration tests', async (t) => {
         await fs.writeFile(mdFile, 'This will break: {BREAK}');
 
         const { stderr } = await captureLoggerCall(async () => {
-            const { port, close } = await startApp({
+            const { close } = await startApp({
                 helpers: {
                     incorrect: 'yep',
                 },

@@ -33,7 +33,7 @@
         "build": "node esbuild.config.mjs",
         "build:types": "tsc",
         "test": "c8 --check-coverage --lines 80 --branches 80 node --test",
-        "test:esm": "c8 node --test ./tests/esm-verify.test.mjs ",
+        "test:esm": "node --test ./tests/esm-verify.test.mjs ",
         "test:coverage": "c8 --reporter=html --reporter=text node --test"
     },
     "files": [
@@ -77,5 +77,19 @@
     "allowScripts": {
         "esbuild@0.28.1": true
     },
-    "types": "types/index.d.ts"
+    "types": "types/index.d.ts",
+    "c8": {
+        "exclude": [
+            "dist/**",
+            "build/**",
+            "coverage/**",
+            "tests/**",
+            "**/*.config.js",
+            "**/*.config.ts"
+        ],
+        "reporter": [
+            "text",
+            "html"
+        ]
+    }
 }

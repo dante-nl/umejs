@@ -81,9 +81,9 @@ test('developer mode tests', async (t) => {
         return {
             port,
             close: async () => {
-                // 1. Close the HTTP server
+                // close http server
                 await new Promise((resolve) => server.close(resolve));
-                // 2. Stop the file watcher
+                // stop file watching
                 if (typeof middleware.close === 'function') {
                     middleware.close();
                 }
@@ -105,17 +105,14 @@ test('developer mode tests', async (t) => {
         await waitForContent(url, 'It works!');
 
         await close();
-        // process.exit(0)
-        // return
     });
 
     await t.test('partialsDir outside contentDir logs a warning', async () => {
-        // Create a separate dir outside contentDir
+        // create a dir outside of where it's supposed to be
         const outsideDir = path.join(tempDir, 'outside');
         await fs.mkdir(outsideDir);
 
         const { stderr } = await captureLoggerCall(async () => {
-            // logger.logWarn('Warning');
             const { close } = await startApp({
                 partialsDir: outsideDir,
                 quiet: false, // we need to see the warning
@@ -131,14 +128,14 @@ test('developer mode tests', async (t) => {
 
         const { port, close } = await startApp();
 
-        // Create a new markdown file while watcher is running
+        // create a new markdown file while watcher is running
         const newFilePath = path.join(contentDir, 'new.md');
         await fs.writeFile(newFilePath, 'Brand new content');
 
-        // Wait for watcher to detect the addition (rename event)
+        // wait for watcher to detect the addition (rename event)
         await delay(300);
 
-        // Both pages should be served
+        // both pages should be served
         const url1 = `http://localhost:${port}/existing`;
         const url2 = `http://localhost:${port}/new`;
 
@@ -159,11 +156,11 @@ test('developer mode tests', async (t) => {
 
         const { port, close } = await startApp({ partialsDir });
 
-        // Modify the partial
+        // modify the partial
         await fs.writeFile(partialFile, '<header>Updated</header>');
         await delay(300);
 
-        // Wait for watcher debounce + rebuild
+        // wait for watcher debounce + rebuild
 
         const url = `http://localhost:${port}/page`;
         const text = await waitForContent(url, 'Updated');
@@ -174,31 +171,28 @@ test('developer mode tests', async (t) => {
 
     await t.test('build error is caught and logged', async () => {
         const mdFile = path.join(contentDir, 'broken.md');
-        // Reference a partial that doesn't exist
+        // reference a partial that doesn't exist
         await fs.writeFile(mdFile, '{_INCLUDE("missing.ume.html")}\n\n# Broken');
 
         const { port, close } = await startApp();
 
-        // Overwrite the file to trigger a rebuild
+        // overwrite the file to trigger a rebuild
         await fs.writeFile(mdFile, '{_INCLUDE("missing.ume.html")}\n\n# Still broken');
 
         await delay(300);
 
-        // The page might still serve old cached content, but the catch block ran.
-        // We can verify by checking that the server still responds.
         const res = await fetch(`http://localhost:${port}/broken`);
-        // It could be 200 (if cached) or 404 – we just don't want a crash.
+        // it could be 200 (if cached) or 404, as long as it isn't a crash.
         assert.ok(res.status === 200 || res.status === 404);
 
         await close();
     });
 
     await t.test('verbose mode and file deletion rebuilds files', async () => {
-        // Create a file, then delete it while watching
+        // create a file, then delete it while watching
         const filePath = path.join(contentDir, 'to-delete.md');
         await fs.writeFile(filePath, 'Delete me');
 
-        // const { port, close } = await startApp({ verbose: true });
         const { port, close } = await startApp({ verbose: false });
 
         await fs.unlink(filePath);

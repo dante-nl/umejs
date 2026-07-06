@@ -6,6 +6,35 @@ const os = require('node:os');
 const express = require('express');
 const ume = require('../index');
 
+function captureLoggerCall(fn) {
+    let stdout = '',
+        stderr = '',
+        exitCode = null;
+    const origExit = process.exit;
+    const origStdout = process.stdout.write;
+    const origStderr = process.stderr.write;
+
+    process.exit = (code) => {
+        exitCode = code;
+    };
+    process.stdout.write = (chunk) => {
+        stdout += chunk;
+        return true;
+    };
+    process.stderr.write = (chunk) => {
+        stderr += chunk;
+        return true;
+    };
+
+    fn();
+
+    process.exit = origExit;
+    process.stdout.write = origStdout;
+    process.stderr.write = origStderr;
+
+    return { stdout, stderr, exitCode };
+}
+
 test('umejs integration tests', async (t) => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ume-test-'));
 
@@ -40,7 +69,10 @@ test('umejs integration tests', async (t) => {
 
     // test if simple webpage works (with a simple variable)
     await t.test('simple webpage with standard variable', async () => {
-        await fs.writeFile(path.join(contentDir, 'simple-var.md'), '---\ntest: hi\n---\nCustom var: {test}');
+        await fs.writeFile(
+            path.join(contentDir, 'simple-var.md'),
+            '---\ntitle: hi\n---\nCustom var: {title}',
+        );
         const { port, close } = await startApp();
         const res = await fetch(`http://localhost:${port}/simple-var`);
         assert.match(await res.text(), /Custom var: hi/);
@@ -161,7 +193,7 @@ test('umejs integration tests', async (t) => {
         const text = await res.text();
 
         assert.strictEqual(res.status, 404);
-        assert.strictEqual(text, '<h1>Custom 404</h1>');
+        assert.match(text, /<h1>Custom 404<\/h1>/);
 
         await close();
     });
@@ -177,6 +209,37 @@ test('umejs integration tests', async (t) => {
         assert.match(text, /404 - file not found/);
 
         await close();
+    });
+
+    await t.test('custom 404 page is served (markdown)', async () => {
+        const notFoundMarkdown = path.join(contentDir, '404.md');
+        await fs.writeFile(notFoundMarkdown, '# Custom 404 Markdown');
+
+        const { port, close } = await startApp();
+
+        const res = await fetch(`http://localhost:${port}/missing-md`);
+        const text = await res.text();
+
+        assert.strictEqual(res.status, 404);
+        assert.match(text, /<h1>Custom 404 Markdown<\/h1>/);
+
+        await close();
+    });
+
+    await t.test('invalid helper triggers error', async () => {
+        const mdFile = path.join(contentDir, 'error-helper.md');
+        await fs.writeFile(mdFile, 'This will break: {BREAK}');
+
+        const { stderr } = await captureLoggerCall(async () => {
+            const { port, close } = await startApp({
+                helpers: {
+                    incorrect: 'yep',
+                },
+            });
+
+            await close();
+        });
+        assert.match(stderr, /expected type function, helper is string/);
     });
 
     await t.test('error in helper triggers 500', async () => {

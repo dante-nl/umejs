@@ -2,3 +2,56 @@
 
 .github/
 package-lock.json 
+
+# logs and os junk
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.DS_Store
+
+# node internals
+pids
+*.pid
+*.pid.lock
+lib-cov
+*.tsbuildinfo
+.npm
+.eslintcache
+.stylelintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+.pnp.*
+.yarn/*
+
+# build tool caches
+.grunt
+bower_components
+.lock-wscript
+jspm_packages
+web_modules
+.cache
+.parcel-cache
+.next
+out
+.nuxt
+.output
+.svelte-kit/
+.vitepress
+.docusaurus
+.serverless/
+.fusebox/
+.dynamodb/
+.firebase/
+.tern-port
+.vscode-test
+.pnpm-store
+.vite/
+
+# env and reports
+.env
+.env.*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json

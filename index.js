@@ -229,7 +229,6 @@ module.exports = function ume(options) {
             }
 
             for (const builder of builders) {
-                console.log('HI!!');
                 if (typeof builder === 'function') {
                     const builderOutput = await builder(req, res, slug, finalHtml);
                     if (typeof builderOutput === 'string') {

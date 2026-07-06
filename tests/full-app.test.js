@@ -38,6 +38,15 @@ test('umejs integration tests', async (t) => {
         await close();
     });
 
+    // test if simple webpage works (with a simple variable)
+    await t.test('simple webpage with standard variable', async () => {
+        await fs.writeFile(path.join(contentDir, 'simple-var.md'), '---\ntest: hi\n---\nCustom var: {test}');
+        const { port, close } = await startApp();
+        const res = await fetch(`http://localhost:${port}/simple-var`);
+        assert.match(await res.text(), /Custom var: hi/);
+        await close();
+    });
+
     // custom helper
     await t.test('supports custom helpers (cache)', async () => {
         await fs.writeFile(path.join(contentDir, 'helper.md'), 'Test: {test}');

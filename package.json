@@ -1,37 +1,95 @@
 {
-  "name": "@dantenl/umejs",
-  "version": "1.1.0",
-  "description": "Untitled Markdown Engine",
-  "keywords": [],
-  "homepage": "https://github.com/dante-nl/umejs#readme",
-  "bugs": {
-    "url": "https://github.com/dante-nl/umejs/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/dante-nl/umejs.git"
-  },
-  "license": "GPL-3.0",
-  "author": "dante_nl",
-  "type": "commonjs",
-  "main": "index.js",
-  "directories": {
-    "lib": "lib"
-  },
-  "scripts": {
-    "test": "node --test"
-  },
-  "files": [
-    "index.js",
-    "lib/"
-  ],
-  "engines": {
-    "node": "^22.0.0"
-  },
-  "dependencies": {
-    "express": "^5.2.1",
-    "gray-matter": "^4.0.3",
-    "marked": "^18.0.5"
-  },
-  "devDependencies": {}
+    "name": "@dantenl/umejs",
+    "version": "1.2.0",
+    "description": "Untitled Markdown Engine",
+    "keywords": [
+        "markdown",
+        "engine",
+        "parser",
+        "express",
+        "static-site",
+        "gray-matter",
+        "marked"
+    ],
+    "homepage": "https://github.com/dante-nl/umejs#readme",
+    "bugs": {
+        "url": "https://github.com/dante-nl/umejs/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/dante-nl/umejs.git"
+    },
+    "license": "GPL-3.0",
+    "author": "dante_nl",
+    "type": "commonjs",
+    "main": "index.js",
+    "directories": {
+        "lib": "lib"
+    },
+    "scripts": {
+        "lint": "eslint .",
+        "lint:fix": "eslint --fix .",
+        "format": "prettier --write .",
+        "build": "node esbuild.config.mjs",
+        "build:types": "tsc",
+        "test": "c8 --check-coverage --lines 80 --branches 80 node --test",
+        "test:esm": "node --test ./tests/esm-verify.test.mjs ",
+        "test:coverage": "c8 --reporter=html --reporter=text node --test"
+    },
+    "files": [
+        "index.js",
+        "lib/",
+        "dist/",
+        "types/"
+    ],
+    "engines": {
+        "node": ">=22.13 <27.0.0"
+    },
+    "dependencies": {
+        "gray-matter": "^4.0.3",
+        "marked": "^18.0.5"
+    },
+    "peerDependencies": {
+        "express": ">=5.0.0"
+    },
+    "exports": {
+        ".": {
+            "types": "./types/index.d.ts",
+            "import": "./dist/esm/index.mjs",
+            "module-sync": "./dist/esm/index.mjs",
+            "require": "./index.js",
+            "default": "./dist/esm/index.mjs"
+        }
+    },
+    "devDependencies": {
+        "@eslint/js": "^10.0.1",
+        "@types/node": "^26.1.0",
+        "c8": "^11.0.0",
+        "esbuild": "^0.28.1",
+        "eslint": "^10.6.0",
+        "globals": "^17.7.0",
+        "prettier": "^3.9.4",
+        "typescript": "^6.0.3"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "allowScripts": {
+        "esbuild@0.28.1": true
+    },
+    "types": "types/index.d.ts",
+    "c8": {
+        "exclude": [
+            "dist/**",
+            "build/**",
+            "coverage/**",
+            "tests/**",
+            "**/*.config.js",
+            "**/*.config.ts"
+        ],
+        "reporter": [
+            "text",
+            "html"
+        ]
+    }
 }

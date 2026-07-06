@@ -146,3 +146,8 @@ vite.config.ts.timestamp-*
 
 # ume gitignore
 .DS_Store
+
+types
+
+coverage/
+.nyc_output/

@@ -56,9 +56,8 @@
         ".": {
             "types": "./types/index.d.ts",
             "import": "./dist/esm/index.mjs",
-            "module-sync": "./dist/esm/index.mjs",
             "require": "./index.js",
-            "default": "./dist/esm/index.mjs"
+            "default": "./index.js"
         }
     },
     "devDependencies": {

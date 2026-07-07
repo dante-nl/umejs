@@ -1,3 +1,7 @@
+# v1.2.1 [2026-07-07]
+
+- Removed `module-sync` from package.json as it was causing issues.
+
 # v1.2.0 [2026-07-06]
 
 - It is now possible to add a custom Markdown parser. These functions receive the Markdown content before it has been parsed and should return new Markdown/HTML.

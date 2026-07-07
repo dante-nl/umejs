@@ -1,6 +1,6 @@
 {
     "name": "@dantenl/umejs",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "Untitled Markdown Engine",
     "keywords": [
         "markdown",
@@ -56,9 +56,8 @@
         ".": {
             "types": "./types/index.d.ts",
             "import": "./dist/esm/index.mjs",
-            "module-sync": "./dist/esm/index.mjs",
             "require": "./index.js",
-            "default": "./dist/esm/index.mjs"
+            "default": "./index.js"
         }
     },
     "devDependencies": {

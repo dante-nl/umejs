@@ -46,7 +46,7 @@
         "node": ">=22.13 <27.0.0"
     },
     "dependencies": {
-        "gray-matter": "^4.0.3",
+        "markdown-frontmatter-parser": "^1.4.0",
         "marked": "^18.0.5"
     },
     "peerDependencies": {

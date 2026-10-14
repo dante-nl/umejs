@@ -13,12 +13,12 @@ module.exports = defineConfig([
             globals: {
                 process: 'readonly',
                 ...globals.browser,
-                ...globals.node
-
+                ...globals.node,
             },
         },
         rules: {
             'no-control-regex': 0,
+            'no-unused-variables': ['error', { argsIgnorePattern: '^_' }],
         },
     },
     { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },

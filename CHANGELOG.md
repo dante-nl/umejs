@@ -1,3 +1,8 @@
+# v1.3.0 [2026-10-14]
+
+- umejs can now cache your files, resulting in faster and more performant start-ups! It won't affect first startups much, but every subsequent one (provided no content changes) goes from about 50ms to just around 10ms!
+- Replaced dependancy [gray-matter](https://www.npmjs.com/package/gray-matter) (responsible for parsing Frontmatter) with [node-markdown-frontmatter-parser](https://www.npmjs.com/package/markdown-frontmatter-parser), due to lack of maintenance and security concerns.
+
 # v1.2.1 [2026-07-07]
 
 - Removed `module-sync` from package.json as it was causing issues.

@@ -47,7 +47,8 @@
     },
     "dependencies": {
         "markdown-frontmatter-parser": "^1.4.0",
-        "marked": "^18.0.5"
+        "marked": "^18.0.5",
+        "workerpool": "^10.0.3"
     },
     "peerDependencies": {
         "express": ">=5.0.0"

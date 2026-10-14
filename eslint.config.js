@@ -13,6 +13,8 @@ module.exports = defineConfig([
             globals: {
                 process: 'readonly',
                 ...globals.browser,
+                ...globals.node
+
             },
         },
         rules: {

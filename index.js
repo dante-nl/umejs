@@ -132,6 +132,16 @@ module.exports = function ume(options) {
     // define cache
     const cache = new Map();
 
+    const astCachePath = path.join(process.cwd(), '.ume-ast-cache.json');
+    let astCache = new Map();
+
+    try {
+        const raw = fs.readFileSync(astCachePath, 'utf-8');
+        astCache = new Map(Object.entries(JSON.parse(raw)));
+    } catch {
+        // first build, no cache
+    }
+
     // * build files
     const buildOptions = {
         contentDir,
@@ -139,6 +149,7 @@ module.exports = function ume(options) {
         partialsDir,
         forbiddenKeys: FORBIDDEN_KEYS,
         cache,
+        astCache,
         quiet,
         verbose,
         cachedHelpers,
@@ -152,6 +163,9 @@ module.exports = function ume(options) {
     } catch (err) {
         logFatal(`Failed to build files: ${err.message}`);
     }
+
+    // save cache
+    fs.writeFileSync(astCachePath, JSON.stringify(Object.fromEntries(astCache)), 'utf-8');
 
     const deltaTime = Date.now() - startTime;
     log(`All files built - took ${deltaTime}ms`, 'green', quiet);

@@ -1,6 +1,7 @@
 # v1.3.0 [2026-10-14]
 
 - umejs can now cache your files, resulting in faster and more performant start-ups! It won't affect first startups much, but every subsequent one (provided no content changes) goes from about 50ms to just around 10ms!
+- added an experimental toggle for building your files asynchronously! This can improve performance on larger projects. On smaller projects, improvements will be negligible. You can enable this by adding `parallel: true` to your umejs options. In the future, this is likely to become default behaviour.
 - Replaced dependancy [gray-matter](https://www.npmjs.com/package/gray-matter) (responsible for parsing Frontmatter) with [node-markdown-frontmatter-parser](https://www.npmjs.com/package/markdown-frontmatter-parser), due to lack of maintenance and security concerns.
 
 # v1.2.1 [2026-07-07]

@@ -56,7 +56,16 @@ test('umejs integration tests', async (t) => {
         const server = app.listen(0);
         await new Promise((resolve) => server.on('listening', resolve));
         const port = server.address().port;
-        return { port, close: () => server.close() };
+        return {
+            port,
+            middleware,
+            close: async () => {
+                await new Promise((resolve) => server.close(resolve));
+                if (typeof middleware.close === 'function') {
+                    await middleware.close();
+                }
+            },
+        };
     };
     // test if simple webpage works
     await t.test('simple webpage', async () => {
@@ -284,7 +293,7 @@ test('umejs integration tests', async (t) => {
 
         app.use('/{*slug}', middleware);
         // Catch-all error handler
-        app.use((err, req, res) => {
+        app.use((err, req, res, _next) => {
             res.status(500).send('Caught error: ' + err.message);
         });
 
@@ -302,5 +311,18 @@ test('umejs integration tests', async (t) => {
         await server.close();
     });
 
-    process.exit(0);
+    await t.test('parallel builds produce identical output to synchronous builds', async () => {
+        await fs.writeFile(path.join(contentDir, 'parity.md'), '# Hello\n\nWorld');
+
+        const sync = await startApp({ parallel: false });
+        const par = await startApp({ parallel: true });
+
+        const syncHtml = await (await fetch(`http://localhost:${sync.port}/parity`)).text();
+        const parHtml = await (await fetch(`http://localhost:${par.port}/parity`)).text();
+
+        assert.strictEqual(parHtml, syncHtml);
+
+        await sync.close();
+        await par.close();
+    });
 });

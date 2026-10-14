@@ -71,11 +71,16 @@ const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build')
 const { setupWatcher } = require('./lib/watcher');
 
 /**
- * umejs expressjs middleware for serving Markdown pages
+ * 🌸 umejs
+ *
+ * Check out the the full documentation [here](https://ume.dantenl.com)!
+ * To quickly get started with umejs, check out the [quickstart](https://ume.dantenl.com/v1/quickstart).
+ *
+ * If you run into any problems, create an issue on the [Github](https://github.com/dante-nl/umejs/), where coincidentally you can also view the source code!
  *
  * @param {UmeOptions} options
  */
-module.exports = function ume(options) {
+function ume(options) {
     let {
         contentDir,
         templatePath,
@@ -369,4 +374,6 @@ module.exports = function ume(options) {
         if (pool) await pool.terminate();
     };
     return middleware;
-};
+}
+
+module.exports = ume;

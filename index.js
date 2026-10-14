@@ -225,7 +225,6 @@ function ume(options) {
 
     const buildPromise = buildAllFiles(buildOptions)
         .then(async (mdFiles) => {
-            if (pool) await pool.terminate();
             // persist ast cache when a build is successful
             if (cachePath !== false) {
                 try {

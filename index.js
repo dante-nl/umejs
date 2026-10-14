@@ -171,25 +171,32 @@ module.exports = function ume(options) {
     function makePoolLexer() {
         let pool = null;
         let terminated = false;
+        let terminationPromise = null;
 
         const getPool = () => {
             if (terminated) throw new Error('Pool already terminated');
             if (!pool) {
                 pool = workerpool.pool(path.join(__dirname, 'lib', 'build-worker.js'), {
                     maxWorkers: Math.max(1, os.cpus().length - 1),
-                    // workerpool's default idle timeout keeps workers alive for 30s;
-                    // shortening it also helps in tests.
-                    // workerIdleTimeout: 1000,
                 });
             }
             return pool;
         };
 
         return {
-            lexer: (markdown) => getPool().exec('lexAndParse', [markdown]),
-            terminate: async () => {
-                terminated = true;
-                if (pool) await pool.terminate();
+            lexer: (/** @type {string} */ markdown) => getPool().exec('lexAndParse', [markdown]),
+            pool: {
+                terminate: () => {
+                    if (terminationPromise) return terminationPromise;
+                    terminated = true;
+                    if (pool) {
+                        // true = force terminate immediately, don't wait for graceful shutdown
+                        terminationPromise = pool.terminate(true);
+                    } else {
+                        terminationPromise = Promise.resolve();
+                    }
+                    return terminationPromise;
+                },
             },
         };
     }
@@ -212,8 +219,8 @@ module.exports = function ume(options) {
     };
 
     const buildPromise = buildAllFiles(buildOptions)
-        .then((mdFiles) => {
-            if (pool) pool.terminate();
+        .then(async (mdFiles) => {
+            if (pool) await pool.terminate();
             // persist ast cache when a build is successful
             if (cachePath !== false) {
                 try {
@@ -248,10 +255,10 @@ module.exports = function ume(options) {
 
             return mdFiles;
         })
-        .catch((err) => {
+        .catch(async (err) => {
             logError(`Build failed: ${err.message}`, quiet);
             // Terminate pool so we don't leak workers
-            if (pool) pool.terminate();
+            if (pool) await pool.terminate();
             throw err;
         });
 

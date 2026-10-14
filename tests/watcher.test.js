@@ -65,11 +65,11 @@ test('developer mode tests', async (t) => {
     const startApp = async (options) => {
         const app = express();
         const middleware = ume({
-            // ← store it
             contentDir,
             templatePath,
             quiet: true,
             mode: 'development',
+            cachePath: path.join(tempDir, '.umejs-cache.json'),
             ...options,
         });
         app.use('/{*slug}', middleware);

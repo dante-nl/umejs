@@ -18,16 +18,21 @@ test('async middleware behaviour', async (t) => {
         await fs.rm(tempDir, { recursive: true, force: true });
     });
 
+    const makeMiddleware = (overrides = {}) =>
+        ume({
+            contentDir,
+            templatePath,
+            quiet: true,
+            cachePath: path.join(tempDir, '.ume-cache.json'),
+            parallel: true,
+            ...overrides,
+        });
+
     await t.test('ready resolves to the list of built files', async () => {
         await fs.writeFile(path.join(contentDir, 'a.md'), 'A');
         await fs.writeFile(path.join(contentDir, 'b.md'), 'B');
 
-        const middleware = ume({
-            contentDir,
-            templatePath,
-            quiet: true,
-            parallel: true,
-        });
+        const middleware = makeMiddleware();
 
         const files = await middleware.ready;
         assert.ok(Array.isArray(files));
@@ -38,24 +43,14 @@ test('async middleware behaviour', async (t) => {
     });
 
     await t.test('fatal build failure rejects ready', async () => {
-        const middleware = ume({
-            contentDir: path.join(tempDir, 'does-not-exist'),
-            templatePath,
-            quiet: true,
-            parallel: true,
-        });
+        const middleware = makeMiddleware({ contentDir: path.join(tempDir, 'does-not-exist') });
 
         await assert.rejects(middleware.ready);
         await middleware.close();
     });
 
     await t.test('close is idempotent', async () => {
-        const middleware = ume({
-            contentDir,
-            templatePath,
-            quiet: true,
-            parallel: true,
-        });
+        const middleware = makeMiddleware();
 
         await middleware.ready;
         await middleware.close();
@@ -64,11 +59,7 @@ test('async middleware behaviour', async (t) => {
 
     await t.test('ume() returns without waiting for the build', async () => {
         const start = Date.now();
-        const middleware = ume({
-            contentDir,
-            templatePath,
-            quiet: true,
-            parallel: true,
+        const middleware = makeMiddleware({
             parsers: [
                 async (md) => {
                     await delay(500);
@@ -90,11 +81,7 @@ test('async middleware behaviour', async (t) => {
 
         const express = require('express');
         const app = express();
-        const middleware = ume({
-            contentDir,
-            templatePath,
-            quiet: true,
-            parallel: true,
+        const middleware = makeMiddleware({
             parsers: [
                 async (md) => {
                     await delay(500);
@@ -102,6 +89,7 @@ test('async middleware behaviour', async (t) => {
                 },
             ],
         });
+
         app.use('/{*slug}', middleware);
 
         const server = app.listen(0);

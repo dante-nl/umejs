@@ -55,3 +55,7 @@ out
 .env
 .env.*
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+.vscode
+
+.ume-ast-cache.json

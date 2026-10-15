@@ -1,4 +1,3 @@
-// eslint.config.js
 const { defineConfig } = require('eslint/config');
 const js = require('@eslint/js');
 const globals = require('globals');
@@ -13,10 +12,12 @@ module.exports = defineConfig([
             globals: {
                 process: 'readonly',
                 ...globals.browser,
+                ...globals.node,
             },
         },
         rules: {
             'no-control-regex': 0,
+            'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
         },
     },
     { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },

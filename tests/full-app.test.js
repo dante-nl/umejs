@@ -51,12 +51,28 @@ test('umejs integration tests', async (t) => {
     // helper to start the server
     const startApp = async (options) => {
         const app = express();
-        const middleware = ume({ contentDir, templatePath, quiet: true, ...options });
+        const middleware = ume({
+            contentDir,
+            templatePath,
+            quiet: true,
+            cachePath: path.join(tempDir, '.ume-cache.json'),
+            ...options,
+        });
         app.use('/{*slug}', middleware);
         const server = app.listen(0);
         await new Promise((resolve) => server.on('listening', resolve));
         const port = server.address().port;
-        return { port, close: () => server.close() };
+        return {
+            port,
+            middleware,
+            close: async () => {
+                server.closeAllConnections();
+                await new Promise((resolve) => server.close(resolve));
+                if (typeof middleware.close === 'function') {
+                    await middleware.close();
+                }
+            },
+        };
     };
     // test if simple webpage works
     await t.test('simple webpage', async () => {
@@ -151,36 +167,6 @@ test('umejs integration tests', async (t) => {
         await close();
     });
 
-    await t.test('nextUsage on 404 calls next()', async () => {
-        const app = express();
-        const middleware = ume({
-            contentDir,
-            templatePath,
-            quiet: true,
-            nextUsage: true,
-        });
-
-        app.use('/{*slug}', middleware);
-        // add a fallback route to catch if next is called
-        app.use((req, res) => {
-            res.status(404).send('Fallback');
-        });
-
-        const server = app.listen(0);
-        await new Promise((resolve) => server.on('listening', resolve));
-        const port = server.address().port;
-
-        // fetch non-existant page
-        const res = await fetch(`http://localhost:${port}/does-not-exist`);
-        const text = await res.text();
-
-        // check if it's actually 404 and if the text matches
-        assert.strictEqual(res.status, 404);
-        assert.strictEqual(text, 'Fallback');
-
-        server.close();
-    });
-
     await t.test('custom 404 page is served', async () => {
         const notFoundHtml = path.join(tempDir, '404.html');
         await fs.writeFile(notFoundHtml, '<h1>Custom 404</h1>');
@@ -226,6 +212,81 @@ test('umejs integration tests', async (t) => {
         await close();
     });
 
+    await t.test('nextUsage on 404 calls next()', async () => {
+        const app = express();
+        // const middleware = await startApp({ nextUsage: true });
+        const middleware = ume({
+            contentDir,
+            templatePath,
+            quiet: true,
+            nextUsage: true,
+            cachePath: path.join(tempDir, '.ume-cache.json'),
+        });
+
+        app.use('/{*slug}', middleware);
+        // add a fallback route to catch if next is called
+        app.use((req, res) => {
+            res.status(404).send('Fallback');
+        });
+
+        const server = app.listen(0);
+        await new Promise((resolve) => server.on('listening', resolve));
+        const port = server.address().port;
+
+        // fetch non-existant page
+        const res = await fetch(`http://localhost:${port}/does-not-exist`);
+        const text = await res.text();
+
+        // check if it's actually 404 and if the text matches
+        assert.strictEqual(res.status, 404);
+        assert.strictEqual(text, 'Fallback');
+
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+        await middleware.close();
+    });
+
+    await t.test('nextUsage with error calls next(err)', async () => {
+        const app = express();
+
+        const mdFile = path.join(contentDir, 'error-next.md');
+        await fs.writeFile(mdFile, 'This will break: {BREAK}');
+
+        const middleware = ume({
+            contentDir,
+            templatePath,
+            quiet: true,
+            cachePath: path.join(tempDir, '.ume-cache.json'),
+            nextUsage: true,
+            helpers: {
+                BREAK: () => {
+                    throw new Error('Helper error');
+                },
+            },
+        });
+
+        app.use('/{*slug}', middleware);
+        // Catch-all error handler
+        app.use((err, req, res, _next) => {
+            res.status(500).send('Caught error: ' + err.message);
+        });
+
+        const server = app.listen(0);
+        await new Promise((resolve) => server.on('listening', resolve));
+        const port = server.address().port;
+
+        const res = await fetch(`http://localhost:${port}/error-next`);
+        const text = await res.text();
+
+        assert.strictEqual(res.status, 500);
+        assert.match(text, /Caught error: Helper error/);
+        // next was called with the error
+
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+        await middleware.close();
+    });
+
     await t.test('invalid helper triggers error', async () => {
         const mdFile = path.join(contentDir, 'error-helper.md');
         await fs.writeFile(mdFile, 'This will break: {BREAK}');
@@ -263,44 +324,25 @@ test('umejs integration tests', async (t) => {
         await close();
     });
 
-    await t.test('nextUsage with error calls next(err)', async () => {
-        const app = express();
+    await t.test('parallel builds produce identical output to synchronous builds', async () => {
+        await fs.writeFile(path.join(contentDir, 'parity.md'), '# Hello\n\nWorld');
 
-        const mdFile = path.join(contentDir, 'error-next.md');
-        await fs.writeFile(mdFile, 'This will break: {BREAK}');
+        const sync = await startApp({ parallel: false });
+        const par = await startApp({ parallel: true });
 
-        const middleware = ume({
-            contentDir,
-            templatePath,
-            quiet: true,
-            mode: 'development',
-            nextUsage: true,
-            helpers: {
-                BREAK: () => {
-                    throw new Error('Helper error');
-                },
-            },
-        });
+        const syncHtml = await (await fetch(`http://localhost:${sync.port}/parity`)).text();
+        const parHtml = await (await fetch(`http://localhost:${par.port}/parity`)).text();
 
-        app.use('/{*slug}', middleware);
-        // Catch-all error handler
-        app.use((err, req, res) => {
-            res.status(500).send('Caught error: ' + err.message);
-        });
+        assert.strictEqual(parHtml, syncHtml);
 
-        const server = app.listen(0);
-        await new Promise((resolve) => server.on('listening', resolve));
-        const port = server.address().port;
-
-        const res = await fetch(`http://localhost:${port}/error-next`);
-        const text = await res.text();
-
-        assert.strictEqual(res.status, 500);
-        assert.match(text, /Caught error: Helper error/);
-        // next was called with the error
-
-        await server.close();
+        await sync.close();
+        await par.close();
     });
 
-    process.exit(0);
+    // check to see if cache path disabled doesn't crash
+    await t.test('cachePath: false disables cache writes', async () => {
+        const { middleware, close } = await startApp({ cachePath: false });
+        await middleware.ready;
+        await close();
+    });
 });

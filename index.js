@@ -1,5 +1,7 @@
-// ume
+// umejs
 // untitled markdown engine
+// made by dante_nl
+// https://github.com/dante-nl/umejs/
 
 /**
  * Simple helper to just return
@@ -43,6 +45,7 @@
  * @typedef {Object} UmeOptions
  * @property {string} contentDir - **Required**. Path to the directory containing .md files.
  * @property {string} templatePath - **Required**. Path to the HTML template file.
+ * @property {string|false} [cachePath] - Path where to put the umejs cache. Add a path or set to false to disable storing a cache.
  * @property {boolean} [quiet=false] - Suppress all console output except errors.
  * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
  * @property {boolean} [nextUsage=false] - When encountering a 404 or 500 error, should umejs call next() and do nothing?
@@ -52,24 +55,36 @@
  * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
  * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown
  * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML
+ * @property {boolean} [parallel=false] - Use the **experimental** worker thread to build files in parrallel.
+ *  Recommended when contentDir has a lot of files. Note that it requires more CPU and memory, but is likely to be faster.
+ *  This setting will likely default to true in a future version of umejs. It is recommended to explicitily set it to `false` if you never want to use it.
  */
 
+const os = require('node:os');
+const workerpool = require('workerpool');
 const fs = require('node:fs');
 const path = require('node:path');
+const { marked } = require('marked');
 const { replaceAll } = require('./lib/helpers');
 const { log, logError, logFatal, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
 const { setupWatcher } = require('./lib/watcher');
 
 /**
- * umejs expressjs middleware for serving Markdown pages
+ * 🌸 umejs
+ *
+ * Check out the the full documentation [here](https://ume.dantenl.com)!
+ * To quickly get started with umejs, check out the [quickstart](https://ume.dantenl.com/v1/quickstart).
+ *
+ * If you run into any problems, create an issue on the [Github](https://github.com/dante-nl/umejs/), where coincidentally you can also view the source code!
  *
  * @param {UmeOptions} options
  */
-module.exports = function ume(options) {
+function ume(options) {
     let {
         contentDir,
         templatePath,
+        cachePath,
         quiet,
         verbose,
         helpers,
@@ -79,11 +94,14 @@ module.exports = function ume(options) {
         builders,
         parsers,
         nextUsage,
+        parallel,
     } = options;
 
     helpers = helpers || {};
     builders = builders || [];
     mode = mode || 'production';
+
+    let watcher = null;
 
     const FORBIDDEN_KEYS = [...RESERVED_KEYS, ...Object.keys(helpers)];
 
@@ -132,6 +150,64 @@ module.exports = function ume(options) {
     // define cache
     const cache = new Map();
 
+    const astCachePath = cachePath || path.join(process.cwd(), '.ume-ast-cache.json');
+    let astCache = new Map();
+
+    try {
+        const raw = fs.readFileSync(astCachePath, 'utf-8');
+        astCache = new Map(Object.entries(JSON.parse(raw)));
+    } catch {
+        // first build, no cache
+    }
+
+    // local (synchronous) lexer for use when parallel is not enabled
+    function makeLocalLexer() {
+        return {
+            lexer: async (markdown) => {
+                const tokens = marked.lexer(markdown);
+                const html = marked.parser(tokens);
+                return { tokens, html };
+            },
+            pool: null,
+        };
+    }
+
+    // worker pool lexer
+    function makePoolLexer() {
+        let pool = null;
+        let terminated = false;
+        let terminationPromise = null;
+
+        const getPool = () => {
+            if (terminated) throw new Error('Pool already terminated');
+            if (!pool) {
+                pool = workerpool.pool(path.join(__dirname, 'lib', 'build-worker.js'), {
+                    maxWorkers: Math.max(1, os.cpus().length - 1),
+                });
+            }
+            return pool;
+        };
+
+        return {
+            lexer: (/** @type {string} */ markdown) => getPool().exec('lexAndParse', [markdown]),
+            pool: {
+                terminate: () => {
+                    if (terminationPromise) return terminationPromise;
+                    terminated = true;
+                    if (pool) {
+                        // true = force terminate immediately, don't wait for graceful shutdown
+                        terminationPromise = pool.terminate(true);
+                    } else {
+                        terminationPromise = Promise.resolve();
+                    }
+                    return terminationPromise;
+                },
+            },
+        };
+    }
+
+    const { lexer, pool } = parallel ? makePoolLexer() : makeLocalLexer();
+
     // * build files
     const buildOptions = {
         contentDir,
@@ -139,40 +215,62 @@ module.exports = function ume(options) {
         partialsDir,
         forbiddenKeys: FORBIDDEN_KEYS,
         cache,
+        astCache,
         quiet,
         verbose,
         cachedHelpers,
         parsers,
+        lexer,
     };
 
-    let mdFiles = [];
+    const buildPromise = buildAllFiles(buildOptions)
+        .then(async (mdFiles) => {
+            // persist ast cache when a build is successful
+            if (cachePath !== false) {
+                try {
+                    if (verbose) {
+                        log(`Creating a cache at ${astCachePath}`, null, false);
+                    }
+                    fs.writeFileSync(
+                        astCachePath,
+                        JSON.stringify(Object.fromEntries(astCache)),
+                        'utf-8',
+                    );
+                } catch (err) {
+                    logWarn(`Could not save AST cache: ${err.message}`);
+                }
+            }
 
-    try {
-        mdFiles = buildAllFiles(buildOptions);
-    } catch (err) {
-        logFatal(`Failed to build files: ${err.message}`);
-    }
+            if (mode === 'development') {
+                watcher = setupWatcher({
+                    contentDir,
+                    partialsDir,
+                    cache,
+                    buildSingleFile: (file) => buildSingleFile(file, buildOptions),
+                    mdFiles,
+                    quiet,
+                    verbose,
+                    astCache,
+                });
+            }
 
-    const deltaTime = Date.now() - startTime;
-    log(`All files built - took ${deltaTime}ms`, 'green', quiet);
+            const deltaTime = Date.now() - startTime;
+            log(`All files built - took ${deltaTime}ms`, 'green', quiet);
 
-    // * dev mode
-    let watcher;
-    if (mode === 'development') {
-        watcher = setupWatcher({
-            contentDir,
-            partialsDir,
-            cache,
-            buildSingleFile: (file) => buildSingleFile(file, buildOptions),
-            mdFiles,
-            quiet,
-            verbose,
+            return mdFiles;
+        })
+        .catch(async (err) => {
+            logError(`Build failed: ${err.message}`, quiet);
+            // Terminate pool so we don't leak workers
+            if (pool) await pool.terminate();
+            throw err;
         });
-    }
 
     // * express middleware
     const middleware = async function (req, res, next) {
         try {
+            await buildPromise;
+
             let slug = req.params.slug || req.params[0] || 'index';
 
             if (Array.isArray(slug)) {
@@ -267,10 +365,14 @@ module.exports = function ume(options) {
             }
         }
     };
-    if (watcher) {
-        middleware.close = function closeWatcher() {
-            watcher.close();
-        };
-    }
+
+    middleware.ready = buildPromise;
+
+    middleware.close = async function close() {
+        if (watcher) watcher.close();
+        if (pool) await pool.terminate();
+    };
     return middleware;
-};
+}
+
+module.exports = ume;

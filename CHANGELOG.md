@@ -4,6 +4,8 @@
 
 - umejs is now async by default, so it will no longer block Express' `app.listen()`. The build is lazily resolved on first request. If any of your code relied on this behaviour of blocking the main thread (e.g. any code that _has_ to run after umejs is done loading), please [`ume.ready()`](https://ume.dantenl.com/v1/ume-ready)
 
+**Other changes**:
+
 - umejs can now cache your files, resulting in faster and more performant start-ups! It won't affect first startups much, but every subsequent one (provided no content changes) goes from about 50ms to just around 10ms!
     - Alongside this, the configuration option `cachePath` was added; this allows you to either disable caching (set it to `false`) or set it to a custom file name and/or directory.
 - Added an experimental toggle for building your files in parallel! This can improve performance on larger projects. On smaller projects, improvements will be negligible. You can enable this by adding `parallel: true` to your umejs options. In the future, this is likely to become default behaviour. It utilises the module workerpool to lex the Markdown files across multiple CPU cores.

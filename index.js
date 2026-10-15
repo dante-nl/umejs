@@ -229,7 +229,7 @@ function ume(options) {
             if (cachePath !== false) {
                 try {
                     if (verbose) {
-                        log(`Creating a cache at ${cachePath}`, null, false);
+                        log(`Creating a cache at ${astCachePath}`, null, false);
                     }
                     fs.writeFileSync(
                         astCachePath,

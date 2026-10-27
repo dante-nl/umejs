@@ -44,7 +44,7 @@
  *
  * @typedef {Object} UmeOptions
  * @property {string} contentDir - **Required**. Path to the directory containing .md files.
- * @property {string} templatePath - **Required**. Path to the HTML template file.
+ * @property {string} [templatePath] - Path to the HTML template file.
  * @property {string|false} [cachePath] - Path where to put the umejs cache. Add a path or set to false to disable storing a cache.
  * @property {boolean} [quiet=false] - Suppress all console output except errors.
  * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
@@ -53,11 +53,15 @@
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
  * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
  * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
- * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown
- * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML
+ * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown.
+ * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML.
  * @property {boolean} [parallel=false] - Use the **experimental** worker thread to build files in parrallel.
  *  Recommended when contentDir has a lot of files. Note that it requires more CPU and memory, but is likely to be faster.
  *  This setting will likely default to true in a future version of umejs. It is recommended to explicitily set it to `false` if you never want to use it.
+ * @property {Array<string>} [themes] - An array of paths or package names of umejs themes to load.
+ * @property {string} [templatesDir] - Path to templates directory (overrides theme templates).
+ * @property {string} [assetsDir] - Path to an assets directory (overrides theme assets).
+ * @property {Object} [config] - Custom configuration object passed to themes, parsers, builders, and helpers.
  */
 
 const os = require('node:os');
@@ -66,9 +70,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { marked } = require('marked');
 const { replaceAll } = require('./lib/helpers');
-const { log, logError, logFatal, logWarn } = require('./lib/logger');
+const { log, logError, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
 const { setupWatcher } = require('./lib/watcher');
+const { buildContext } = require('./lib/themes');
 
 /**
  * 🌸 umejs
@@ -83,22 +88,24 @@ const { setupWatcher } = require('./lib/watcher');
 function ume(options) {
     let {
         contentDir,
-        templatePath,
         cachePath,
         quiet,
         verbose,
-        helpers,
+        // helpers,
         mode,
-        partialsDir,
+        // partialsDir,
         notFoundPath,
-        builders,
-        parsers,
+        // builders,
+        // parsers,
         nextUsage,
         parallel,
     } = options;
 
-    helpers = helpers || {};
-    builders = builders || [];
+    const ctx = buildContext(options);
+
+    const helpers = ctx.helpers || {};
+    const builders = ctx.builders || [];
+
     mode = mode || 'production';
 
     let watcher = null;
@@ -140,12 +147,12 @@ function ume(options) {
         }
     }
 
-    let template;
-    try {
-        template = fs.readFileSync(templatePath, 'utf-8');
-    } catch {
-        logFatal(`Template file not found at ${templatePath}`);
-    }
+    // let template;
+    // try {
+    //     template = fs.readFileSync(templatePath, 'utf-8');
+    // } catch {
+    //     logFatal(`Template file not found at ${templatePath}`);
+    // }
 
     // define cache
     const cache = new Map();
@@ -163,7 +170,7 @@ function ume(options) {
     // local (synchronous) lexer for use when parallel is not enabled
     function makeLocalLexer() {
         return {
-            lexer: async (markdown) => {
+            lexer: async (/** @type {string} */ markdown) => {
                 const tokens = marked.lexer(markdown);
                 const html = marked.parser(tokens);
                 return { tokens, html };
@@ -211,16 +218,18 @@ function ume(options) {
     // * build files
     const buildOptions = {
         contentDir,
-        template,
-        partialsDir,
+        // template,
+        // partialsDir,
+        ctx,
         forbiddenKeys: FORBIDDEN_KEYS,
         cache,
         astCache,
         quiet,
         verbose,
         cachedHelpers,
-        parsers,
+        // parsers,
         lexer,
+        templateCache: new Map(),
     };
 
     const buildPromise = buildAllFiles(buildOptions)
@@ -244,7 +253,7 @@ function ume(options) {
             if (mode === 'development') {
                 watcher = setupWatcher({
                     contentDir,
-                    partialsDir,
+                    partialsDir: options.partialsDir,
                     cache,
                     buildSingleFile: (file) => buildSingleFile(file, buildOptions),
                     mdFiles,
@@ -317,7 +326,8 @@ function ume(options) {
 
             for (let [key, fn] of Object.entries(realtimeHelpers)) {
                 if (typeof fn === 'function') {
-                    const dynamicValue = await fn(req, res, slug);
+                    const dynamicValue = await fn(req, res, slug, ctx.config);
+                    // also parse configuration to the realtime helpers
                     finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
                 } else {
                     logWarn(
@@ -328,7 +338,7 @@ function ume(options) {
 
             for (const builder of builders) {
                 if (typeof builder === 'function') {
-                    const builderOutput = await builder(req, res, slug, finalHtml);
+                    const builderOutput = await builder(req, res, slug, finalHtml, ctx.config);
                     if (typeof builderOutput === 'string') {
                         finalHtml = builderOutput;
                     }

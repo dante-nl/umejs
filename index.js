@@ -285,7 +285,6 @@ function ume(options) {
                 const indexHtml = cache.get(indexSlug);
                 if (indexHtml) {
                     html = indexHtml;
-                    // slug = indexSlug;
                 }
             }
 

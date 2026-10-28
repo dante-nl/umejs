@@ -272,13 +272,22 @@ function ume(options) {
 
                 if (assetPath) {
                     return res.sendFile(assetPath, { dotfiles: 'allow' });
-                } else {
-                    if (nextUsage) return next();
-                    return res.status(404).send(`Asset not found: ${assetName}`);
                 }
+                // continue even if no asset is found; a user might have a file there anyways
+                // though mainly bcs im lazy and there's a 99.9% chance that it just goes straight to 404 logic
             }
 
             let html = cache.get(slug);
+            // try if there's a nested index page
+            // e.g. /foo/bar/index.md
+            if (!html && slug !== 'index' && !slug.endsWith('/index')) {
+                const indexSlug = slug + '/index';
+                const indexHtml = cache.get(indexSlug);
+                if (indexHtml) {
+                    html = indexHtml;
+                    // slug = indexSlug;
+                }
+            }
 
             // check if page exists
             if (!slug || !html) {

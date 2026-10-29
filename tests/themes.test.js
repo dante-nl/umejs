@@ -194,6 +194,10 @@ test('buildContext', async (t) => {
             themes: [themeDir],
             config: { b: { y: 99 }, c: 3 },
         });
+
+        // remove _ume because its unneeded here
+        delete ctx.config._ume;
+
         assert.deepEqual(ctx.config, { a: 1, b: { x: 1, y: 99 }, c: 3 });
     });
 

@@ -407,6 +407,9 @@ function ume(options) {
         if (watcher) watcher.close();
         if (pool) await pool.terminate();
     };
+
+    middleware.ctx = ctx;
+
     return middleware;
 }
 

@@ -51,6 +51,7 @@ jobs:
     # publish to npm
     publish-npm:
         needs: test
+        if: github.event.release.prerelease == false
         runs-on: ubuntu-latest
         permissions:
             id-token: write
@@ -75,3 +76,31 @@ jobs:
 
             - name: Publish Package via Trusted Publisher
               run: npm publish --access public --provenance
+
+    # publish prereleases from the dev branch
+    publish-prerelease:
+        needs: test
+        if: github.event.release.prerelease == true && github.event.release.target_commitish == 'dev'
+        runs-on: ubuntu-latest
+        permissions:
+            id-token: write
+            contents: read
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 'lts/*'
+                  registry-url: 'https://registry.npmjs.org'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build ESM and JSDoc Types
+              run: |
+                  npm run build
+                  npm run build:types
+            - name: Publish Package via Trusted Publisher
+              run: npm publish --access public --provenance --tag dev

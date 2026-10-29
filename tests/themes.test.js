@@ -175,8 +175,21 @@ test('loadThemes', async (t) => {
         const childDir = await makeTheme(tempDir, 'child-theme', { extends: [parentDir] });
         const themes = loadThemes([childDir]);
         assert.equal(themes.length, 2);
-        assert.equal(themes[0].manifest.name, 'parent-theme');
-        assert.equal(themes[1].manifest.name, 'child-theme');
+        assert.equal(themes[0].manifest.name, 'child-theme');
+        assert.equal(themes[1].manifest.name, 'parent-theme');
+    });
+
+    await t.test('child config overrides parent config', async () => {
+        const parentDir = await makeTheme(tempDir, 'pri-parent', {
+            config: { color: 'blue', title: 'Parent Title' },
+        });
+        const childDir = await makeTheme(tempDir, 'pri-child', {
+            extends: [parentDir],
+            config: { title: 'Child Title' },
+        });
+        const ctx = buildContext({ contentDir: '/tmp/x', themes: [childDir] });
+        assert.equal(ctx.config.color, 'blue'); // from parent
+        assert.equal(ctx.config.title, 'Child Title'); // child wins over parent
     });
 });
 

@@ -1,3 +1,23 @@
+# v1.4.0 [2026-10-30]
+
+- Added support for themes! Themes can be easily added via npm, or can be defined locally. I'll also be releasing some themes myself.
+    - This brings the addition of the `config` key in the ume options; options that are directly parsed to themes and provided by themes.
+        - Keys of type string inside the config object are automatically available as variables as well
+    - Themes can be written as either ESM or as CommonJS. They can of course also be written as TypeScript, but might need to be compiled first.
+    - This supports version compatibility for umejs as well, in a similar format as Nodejs; meaning themes can only be enabled if a certain minimum version is present for example.
+- Added asset routing in the `/_ume/assets/*` route to serve static assets for themes (e.g. CSS and fonts).
+- Added the `{_BASE}` variable, which automatically injects the Express base URL (e.g. `/blog`)
+- Added dynamic template resolution. This happens in the following order of preference:
+    1. if a template is defined in frontmatter, that one is used. (Note: you would have to make this accessible via the `templateDir` key in ume options; themes can make theirs accessible as well)
+    2. the default template as defined in `templatePath` is used
+    3. the default template chosen by the theme is used
+
+    umejs will first try number one, then two and then three.
+
+- Helpers and builders now also receive the merged `config` object as their final argument
+- Added inline includes; either via themes or regularly via the ume config. This allows creating {INCLUDE()} statements without creating a file for them; instead they're stored in memory.
+- Improved `index.md` functionality; it now works in sub-directories as well. For example, both `/blog/` and `/blog/2026/october/` can have an `index.md` file.
+
 # v1.3.0 [2026-10-15]
 
 **Breaking change**:

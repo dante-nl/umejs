@@ -44,20 +44,23 @@
  *
  * @typedef {Object} UmeOptions
  * @property {string} contentDir - **Required**. Path to the directory containing .md files.
- * @property {string} templatePath - **Required**. Path to the HTML template file.
+ * @property {string} [templatePath] - Path to the default HTML template file.
  * @property {string|false} [cachePath] - Path where to put the umejs cache. Add a path or set to false to disable storing a cache.
  * @property {boolean} [quiet=false] - Suppress all console output except errors.
  * @property {boolean} [verbose=false] - Enable detailed build logs (overrides quiet).
  * @property {boolean} [nextUsage=false] - When encountering a 404 or 500 error, should umejs call next() and do nothing?
- * @property {Record<string, Helper>} [helpers] - Optional extra functions that run on build or for every request
+ * @property {Record<string, Helper>} [helpers] - Optional extra functions that run on build or for every request.
+ * @property {Record<string, string>} [includes] - Optional inline partials, referenced by name in `{_INCLUDE("name")}`.
+ * @property {Array<string>} [themes] - Optional list of theme package names or paths, ordered by priority.
+ * @property {Object} [config] - Optional configuration merged over theme defaults and passed to helpers, parsers, and builders.
+ * @property {string} [templatesDir] - Optional user templates directory (overrides theme templates).
+ * @property {string} [partialsDir] - Path to partials directory. If omitted, file-based partials are disabled (inline `includes` still work).
+ * @property {string} [assetsDir] - Optional user assets directory (overrides theme assets).
  * @property {'development' | 'production'} [mode='production'] - 'development' enables file watching.
- * @property {string} [partialsDir] - Path to partials directory. If omitted, partials are disabled.
  * @property {string} [notFoundPath] - Path to an HTML page to be served for a 404 error.
- * @property {Array<Function>} [parsers] - An array of custom functions that get passed the raw Markdown on build and should return valid Markdown
- * @property {Array<Function>} [builders] - An array of custom functions that get passed the near final HTML and should return HTML
- * @property {boolean} [parallel=false] - Use the **experimental** worker thread to build files in parrallel.
- *  Recommended when contentDir has a lot of files. Note that it requires more CPU and memory, but is likely to be faster.
- *  This setting will likely default to true in a future version of umejs. It is recommended to explicitily set it to `false` if you never want to use it.
+ * @property {Array<Function>} [parsers] - Custom functions that receive raw Markdown and return transformed Markdown.
+ * @property {Array<Function>} [builders] - Custom functions that receive final HTML and return transformed HTML. Signature: `(req, res, slug, finalHtml, config) => string`
+ * @property {boolean} [parallel=false] - Use the **experimental** worker thread to build files in parallel.
  */
 
 const os = require('node:os');
@@ -66,9 +69,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { marked } = require('marked');
 const { replaceAll } = require('./lib/helpers');
-const { log, logError, logFatal, logWarn } = require('./lib/logger');
+const { log, logError, logWarn } = require('./lib/logger');
 const { buildAllFiles, buildSingleFile, RESERVED_KEYS } = require('./lib/build');
 const { setupWatcher } = require('./lib/watcher');
+const { buildContext } = require('./lib/themes');
 
 /**
  * 🌸 umejs
@@ -81,24 +85,14 @@ const { setupWatcher } = require('./lib/watcher');
  * @param {UmeOptions} options
  */
 function ume(options) {
-    let {
-        contentDir,
-        templatePath,
-        cachePath,
-        quiet,
-        verbose,
-        helpers,
-        mode,
-        partialsDir,
-        notFoundPath,
-        builders,
-        parsers,
-        nextUsage,
-        parallel,
-    } = options;
+    let { contentDir, cachePath, quiet, verbose, mode, notFoundPath, nextUsage, parallel } =
+        options;
 
-    helpers = helpers || {};
-    builders = builders || [];
+    const ctx = buildContext(options);
+
+    const helpers = ctx.helpers || {};
+    const builders = ctx.builders || [];
+
     mode = mode || 'production';
 
     let watcher = null;
@@ -140,13 +134,6 @@ function ume(options) {
         }
     }
 
-    let template;
-    try {
-        template = fs.readFileSync(templatePath, 'utf-8');
-    } catch {
-        logFatal(`Template file not found at ${templatePath}`);
-    }
-
     // define cache
     const cache = new Map();
 
@@ -163,7 +150,7 @@ function ume(options) {
     // local (synchronous) lexer for use when parallel is not enabled
     function makeLocalLexer() {
         return {
-            lexer: async (markdown) => {
+            lexer: async (/** @type {string} */ markdown) => {
                 const tokens = marked.lexer(markdown);
                 const html = marked.parser(tokens);
                 return { tokens, html };
@@ -211,16 +198,15 @@ function ume(options) {
     // * build files
     const buildOptions = {
         contentDir,
-        template,
-        partialsDir,
+        ctx,
         forbiddenKeys: FORBIDDEN_KEYS,
         cache,
         astCache,
         quiet,
         verbose,
         cachedHelpers,
-        parsers,
         lexer,
+        templateCache: new Map(),
     };
 
     const buildPromise = buildAllFiles(buildOptions)
@@ -244,7 +230,7 @@ function ume(options) {
             if (mode === 'development') {
                 watcher = setupWatcher({
                     contentDir,
-                    partialsDir,
+                    partialsDir: options.partialsDir,
                     cache,
                     buildSingleFile: (file) => buildSingleFile(file, buildOptions),
                     mdFiles,
@@ -280,7 +266,27 @@ function ume(options) {
             // remove leading/trailing slashes if any and .md file extensions
             slug = slug.replace(/^\/|\.md(\/)*$|\/$/g, '');
 
+            if (slug.startsWith('_ume/assets/')) {
+                const assetName = slug.slice('_ume/assets/'.length);
+                const assetPath = ctx.resolveAsset(assetName);
+
+                if (assetPath) {
+                    return res.sendFile(assetPath, { dotfiles: 'allow' });
+                }
+                // continue even if no asset is found; a user might have a file there anyways
+                // though mainly bcs im lazy and there's a 99.9% chance that it just goes straight to 404 logic
+            }
+
             let html = cache.get(slug);
+            // try if there's a nested index page
+            // e.g. /foo/bar/index.md
+            if (!html && slug !== 'index' && !slug.endsWith('/index')) {
+                const indexSlug = slug + '/index';
+                const indexHtml = cache.get(indexSlug);
+                if (indexHtml) {
+                    html = indexHtml;
+                }
+            }
 
             // check if page exists
             if (!slug || !html) {
@@ -315,9 +321,38 @@ function ume(options) {
             // replace _SLUG
             finalHtml = replaceAll(finalHtml, `{_SLUG}`, slug);
 
+            // inject base url for themes so they can link assets correctly
+            let baseUrl = (req.originalUrl || req.url).split('?')[0];
+
+            // remove trailing slash for consistent comparison
+            if (baseUrl.endsWith('/')) {
+                baseUrl = baseUrl.slice(0, -1);
+            }
+
+            // strip the slug from the end (handles both encoded and unencoded URLs)
+            const encodedSlug = encodeURI(slug);
+            if (
+                slug &&
+                slug !== 'index' &&
+                (baseUrl.endsWith(slug) || baseUrl.endsWith(encodedSlug))
+            ) {
+                const stripLength = baseUrl.endsWith(slug) ? slug.length : encodedSlug.length;
+                baseUrl = baseUrl.slice(0, -stripLength);
+                // remove any remaining trailing slash after stripping the slug
+                if (baseUrl.endsWith('/')) {
+                    baseUrl = baseUrl.slice(0, -1);
+                }
+            } else if (baseUrl.endsWith('/index')) {
+                // handle the case where someone explicitly visits /blog/index
+                baseUrl = baseUrl.slice(0, -6);
+            }
+
+            finalHtml = replaceAll(finalHtml, `{_BASE}`, baseUrl);
+
             for (let [key, fn] of Object.entries(realtimeHelpers)) {
                 if (typeof fn === 'function') {
-                    const dynamicValue = await fn(req, res, slug);
+                    const dynamicValue = await fn(req, res, slug, ctx.config);
+                    // also parse configuration to the realtime helpers
                     finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
                 } else {
                     logWarn(
@@ -328,7 +363,7 @@ function ume(options) {
 
             for (const builder of builders) {
                 if (typeof builder === 'function') {
-                    const builderOutput = await builder(req, res, slug, finalHtml);
+                    const builderOutput = await builder(req, res, slug, finalHtml, ctx.config);
                     if (typeof builderOutput === 'string') {
                         finalHtml = builderOutput;
                     }
@@ -372,6 +407,9 @@ function ume(options) {
         if (watcher) watcher.close();
         if (pool) await pool.terminate();
     };
+
+    middleware.ctx = ctx;
+
     return middleware;
 }
 

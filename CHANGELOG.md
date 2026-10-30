@@ -1,4 +1,4 @@
-# v1.4.0 []
+# v1.4.0 [2026-10-30]
 
 - Added support for themes! Themes can be easily added via npm, or can be defined locally. I'll also be releasing some themes myself.
     - This brings the addition of the `config` key in the ume options; options that are directly parsed to themes and provided by themes.

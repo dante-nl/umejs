@@ -1,3 +1,8 @@
+# v1.4.1 [2026-11-04]
+
+- Fixed a bug where `parallel: true` would fail to build certain files when importing umejs as an ESM file.
+- umejs now logs full error details when verbose is true and a file fails to build for some reason.
+
 # v1.4.0 [2026-10-30]
 
 - Added support for themes! Themes can be easily added via npm, or can be defined locally. I'll also be releasing some themes myself.

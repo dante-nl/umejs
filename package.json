@@ -1,6 +1,6 @@
 {
     "name": "@dantenl/umejs",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "description": "Untitled Markdown Engine",
     "keywords": [
         "markdown",
@@ -75,7 +75,7 @@
         "access": "public"
     },
     "allowScripts": {
-        "esbuild@0.28.1": true
+        "esbuild@0.28.2": true
     },
     "types": "types/index.d.ts",
     "c8": {

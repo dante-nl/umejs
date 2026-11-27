@@ -153,3 +153,5 @@ coverage/
 .nyc_output/
 
 .ume-ast-cache.json
+
+bench-results.txt

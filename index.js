@@ -40,6 +40,27 @@
  */
 
 /**
+ * Semi-private inspection hooks. Exposed for tests and benchmarks only;
+ * shape may change between minor versions without notice.
+ *
+ * @typedef {Object} UmeInternals
+ * @property {Map<string, string>} cache - Compiled HTML for each slug.
+ * @property {Map<string, import('marked').TokensList>} astCache - Parsed AST tokens for each slug.
+ * @property {Map<string, unknown>} templateCache - Compiled template strings (theme + user).
+ */
+
+/**
+ * Callable Express middleware with lifecycle and inspection properties.
+ *
+ * @typedef {import('express').RequestHandler & {
+ *   ready: Promise<string[]>,
+ *   close: () => Promise<void>,
+ *   ctx: object,
+ *   internals: UmeInternals,
+ * }} UmeMiddleware
+ */
+
+/**
  * Configuration options for the ume middleware.
  *
  * @typedef {Object} UmeOptions
@@ -83,6 +104,7 @@ const { buildContext } = require('./lib/themes');
  * If you run into any problems, create an issue on the [Github](https://github.com/dante-nl/umejs/), where coincidentally you can also view the source code!
  *
  * @param {UmeOptions} options
+ * @returns {UmeMiddleware}
  */
 function ume(options) {
     let { contentDir, cachePath, quiet, verbose, mode, notFoundPath, nextUsage, parallel } =
@@ -227,6 +249,10 @@ function ume(options) {
                 }
             }
 
+            // free ast cache as it served its purpose for initial build; freeing the precious ram
+            astCache.clear();
+            if (verbose) log('astCache cleared post-build (benchmark flag)', null, false);
+
             if (mode === 'development') {
                 watcher = setupWatcher({
                     contentDir,
@@ -319,7 +345,9 @@ function ume(options) {
 
             let finalHtml = html;
             // replace _SLUG
-            finalHtml = replaceAll(finalHtml, `{_SLUG}`, slug);
+            // if (finalHtml.includes('{_SLUG}')) {
+            //     finalHtml = replaceAll(finalHtml, '{_SLUG}', slug);
+            // }
 
             // inject base url for themes so they can link assets correctly
             let baseUrl = (req.originalUrl || req.url).split('?')[0];
@@ -347,13 +375,16 @@ function ume(options) {
                 baseUrl = baseUrl.slice(0, -6);
             }
 
-            finalHtml = replaceAll(finalHtml, `{_BASE}`, baseUrl);
+            if (finalHtml.includes('{_BASE}')) {
+                finalHtml = replaceAll(finalHtml, '{_BASE}', baseUrl);
+            }
 
             for (let [key, fn] of Object.entries(realtimeHelpers)) {
                 if (typeof fn === 'function') {
+                    const marker = `{${key}}`;
+                    if (!finalHtml.includes(marker)) continue;
                     const dynamicValue = await fn(req, res, slug, ctx.config);
-                    // also parse configuration to the realtime helpers
-                    finalHtml = replaceAll(finalHtml, `{${key}}`, dynamicValue);
+                    finalHtml = replaceAll(finalHtml, marker, dynamicValue);
                 } else {
                     logWarn(
                         `Invalid helper provided (expected type function, helper is ${typeof fn})`,
@@ -376,14 +407,14 @@ function ume(options) {
 
             await finalHtml;
 
-            // handle any escaped characters and turn them normal
-            const escapedVarRegex = /(?:{{([^}]+)}}|\\{([^}]+)})/g;
-            finalHtml = finalHtml.replace(escapedVarRegex, '{$1$2}');
-
-            // handle any escaped {_INCLUDE()} statements
-            const escapedIncludeRegex =
-                /(?:{{(_INCLUDE\(["'][^"']+["']\))\}}|\\{(_INCLUDE\(["'][^"']+["']\))\})/g;
-            finalHtml = finalHtml.replace(escapedIncludeRegex, '{$1$2}');
+            // handle escaped includes and variables
+            if (finalHtml.includes('{{') || finalHtml.includes('\\{')) {
+                finalHtml = finalHtml.replace(/(?:{{([^}]+)}}|\\{([^}]+)})/g, '{$1$2}');
+                finalHtml = finalHtml.replace(
+                    /(?:{{(_INCLUDE\(["'][^"']+["']\))\}}|\\{(_INCLUDE\(["'][^"']+["']\))\})/g,
+                    '{$1$2}',
+                );
+            }
 
             res.set('Content-Type', 'text/html');
             res.send(finalHtml);
@@ -409,6 +440,13 @@ function ume(options) {
     };
 
     middleware.ctx = ctx;
+
+    // ? semi-private; mainly for tests and benchmarks
+    middleware.internals = {
+        cache,
+        astCache,
+        templateCache: buildOptions.templateCache,
+    };
 
     return middleware;
 }

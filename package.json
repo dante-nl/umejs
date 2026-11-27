@@ -1,6 +1,6 @@
 {
     "name": "@dantenl/umejs",
-    "version": "1.4.1",
+    "version": "1.4.2-dev.1",
     "description": "Untitled Markdown Engine",
     "keywords": [
         "markdown",
@@ -34,7 +34,8 @@
         "build:types": "tsc",
         "test": "c8 --check-coverage --lines 80 --branches 80 node --test",
         "test:esm": "node --test ./tests/esm-verify.test.mjs ",
-        "test:coverage": "c8 --reporter=html --reporter=text node --test"
+        "test:coverage": "c8 --reporter=html --reporter=text node --test",
+        "bench": "node --expose-gc benchmarks/run.js"
     },
     "files": [
         "index.js",

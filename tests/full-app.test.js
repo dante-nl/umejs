@@ -345,4 +345,13 @@ test('umejs integration tests', async (t) => {
         await middleware.ready;
         await close();
     });
+
+    await t.test('exposes internals for inspection', async () => {
+        const { middleware, close } = await startApp();
+        await middleware.ready;
+        assert.ok(middleware.internals.cache instanceof Map);
+        assert.ok(middleware.internals.astCache instanceof Map);
+        assert.ok(middleware.internals.cache.size > 0);
+        await close();
+    });
 });

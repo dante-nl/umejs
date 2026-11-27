@@ -6,6 +6,7 @@
 // Usage:
 //   node --expose-gc benchmarks/run.js
 //   node --expose-gc benchmarks/run.js --scenario baseline   (single scenario)
+//   node --expose-gc benchmarks/run.js 2>&1 | tee bench-results.txt
 
 const express = require('express');
 const { performance, monitorEventLoopDelay } = require('node:perf_hooks');
